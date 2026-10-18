@@ -67,34 +67,9 @@ router.post('/', (req, res) => {
   res.status(201).json({ id: Number(r.lastInsertRowid), message: 'Student added' });
 });
 
-/* PUT /api/students/:id */
+/* PUT /api/students/:id — DISABLED: admin cannot edit student info */
 router.put('/:id', (req, res) => {
-  const b = req.body || {};
-  const s = q.get('SELECT * FROM students WHERE id = ?', req.params.id);
-  if (!s) return res.status(404).json({ error: 'Student not found' });
-  if (b.studentNumber && q.get('SELECT id FROM students WHERE student_number = ? AND id != ?', String(b.studentNumber).trim(), s.id)) {
-    return res.status(409).json({ error: 'LRN already exists' });
-  }
-  q.run(
-    `UPDATE students SET student_number=?, first_name=?, middle_name=?, last_name=?, grade_level=?, strand=?, contact=?, email=?, status=? WHERE id=?`,
-    String(b.studentNumber ?? s.student_number).trim(), String(b.firstName ?? s.first_name).trim(),
-    String(b.middleName ?? s.middle_name).trim(), String(b.lastName ?? s.last_name).trim(),
-    String(b.gradeLevel ?? s.grade_level).trim(), String(b.strand ?? s.strand).trim(),
-    String(b.contact ?? s.contact).trim(), String(b.email ?? s.email).trim(),
-    b.status === 'inactive' ? 'inactive' : (b.status === 'active' ? 'active' : s.status),
-    s.id
-  );
-  /* keep the login account in sync */
-  if (q.get('SELECT id FROM users WHERE student_id = ?', s.id)) {
-    q.run('UPDATE users SET name = ?, email = ? WHERE student_id = ?',
-      (b.firstName ?? s.first_name) + ' ' + (b.lastName ?? s.last_name),
-      String(b.email ?? s.email).trim().toLowerCase() || s.email, s.id);
-    if (b.accountStatus === 'active' || b.accountStatus === 'disabled') {
-      q.run('UPDATE users SET status = ? WHERE student_id = ?', b.accountStatus, s.id);
-    }
-  }
-  logActivity(req.user.id, req.user.name, 'EDIT_STUDENT', '#' + s.id);
-  res.json({ message: 'Student updated' });
+  res.status(403).json({ error: 'Editing student information is disabled — records can only be updated by registration.' });
 });
 
 /* DELETE /api/students/:id */

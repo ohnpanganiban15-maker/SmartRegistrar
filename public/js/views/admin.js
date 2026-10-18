@@ -103,7 +103,6 @@ function viewAdminStudents() {
         <td data-label="Status">${stamp(s.status)}${s.account_status === 'disabled' ? ' ' + stamp('disabled') : ''}</td>
         <td class="cell-actions" data-label="">
           <button class="btn btn-sm btn-ghost" onclick="viewStudentProfile(${s.id})">View</button>
-          <button class="btn btn-sm btn-outline" onclick="openStudentForm(${s.id})">Edit</button>
           <button class="btn btn-sm btn-danger" onclick="deleteStudent(${s.id})">Delete</button>
         </td>
       </tr>`).join('')}</tbody>

@@ -131,6 +131,12 @@ async function call(method, path, token, body) {
   assert(r.data.pickup_date === '', 'student cannot set pickup date (left empty for admin)');
   const reqId = r.data.id;
   const reqRef = r.data.ref;
+  r = await call('GET', '/api/notifications', admin);
+  assert(r.status === 200 && r.data.some(n => n.title.includes('New Document Request')), 'admin notified of new request');
+  r = await call('GET', '/api/requests/pending-count', admin);
+  assert(r.status === 200 && r.data.count >= 1, 'admin pending-request badge count (' + r.data.count + ')');
+  r = await call('GET', '/api/requests/pending-count', student);
+  assert(r.status === 403, 'student blocked from pending-count');
   r = await call('PUT', `/api/requests/${reqId}/pickup`, student, { date: '2026-10-20' });
   assert(r.status === 403, 'student blocked from setting pickup date');
   r = await call('PUT', `/api/requests/${reqId}/pickup`, admin, { date: 'not-a-date' });
@@ -153,7 +159,7 @@ async function call(method, path, token, body) {
   assert(r.status === 201, 'admin adds student');
   const sid = r.data.id;
   r = await call('PUT', `/api/students/${sid}`, admin, { firstName: 'Temp2', lastName: 'Student', studentNumber: 'TMP-' + uniq.toUpperCase(), gradeLevel: '11' });
-  assert(r.status === 200, 'admin edits student');
+  assert(r.status === 403, 'admin cannot edit student info (403)');
   r = await call('DELETE', `/api/students/${sid}`, admin);
   assert(r.status === 200, 'admin deletes student');
 

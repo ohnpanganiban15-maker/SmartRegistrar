@@ -41,6 +41,8 @@ router.post('/', requireAuth, (req, res) => {
   const created = q.get('SELECT * FROM document_requests WHERE id=?', id);
 
   notify(user.id, 'Request Submitted', 'Your request ' + ref + ' (' + created.doc_type + ') is now pending.');
+  q.all("SELECT id FROM users WHERE role='admin'").forEach(a =>
+    notify(a.id, 'New Document Request', ref + ' — ' + created.doc_type + ' from ' + created.student_name + '.'));
   logActivity(req.user.id, req.user.name, 'SUBMIT_REQUEST', ref + ' ' + created.doc_type);
   res.status(201).json(created);
 });
@@ -56,6 +58,12 @@ router.get('/', requireAuth, (req, res) => {
   if (search) { sql += ' AND (ref LIKE ? OR student_name LIKE ? OR doc_type LIKE ?)'; const l = '%' + search + '%'; params.push(l, l, l); }
   sql += ' ORDER BY created_at DESC';
   res.json(q.all(sql, ...params));
+});
+
+/* GET /api/requests/pending-count — admin badge (pending requests) */
+router.get('/pending-count', requireAuth, (req, res) => {
+  if (req.user.role !== 'admin') return res.status(403).json({ error: 'Admin only' });
+  res.json({ count: q.get("SELECT COUNT(*) c FROM document_requests WHERE status='Pending'").c });
 });
 
 /* PUT /api/requests/:id/status — admin updates, or student cancels own */

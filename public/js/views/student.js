@@ -480,7 +480,7 @@ function viewProfile() {
     <div class="flex mt-14" style="gap:10px;flex-wrap:wrap;">
       <button class="btn btn-outline" onclick="go('changePassword')">Change password</button>
       <button class="btn btn-outline" onclick="changeServer()">Change server</button>
-      <button class="btn btn-danger" onclick="logout()">Log out</button>
+      <button class="btn btn-danger" onclick="askLogout()">Log out</button>
     </div>
   </div>`;
 }

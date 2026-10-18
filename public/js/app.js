@@ -18,6 +18,7 @@ const state = {
   apptAdminFilter: { search: '', status: '', from: '', to: '' },
   reqAdminFilter: { search: '', status: '' },
   unread: 0,
+  pendingReq: 0,
   sidebarOpen: false,
   otpPurpose: '', otpEmail: '', devOtp: ''
 };
@@ -197,7 +198,7 @@ function studentShell(content) {
           ${unread ? `<span class="badge-dot pill-count">${unread > 9 ? '9+' : unread}</span>` : ''}</button>
         ${themeBtnHTML()}
         <button class="icon-btn" onclick="go('myQr')" title="My QR code">▣</button>
-        <button class="icon-btn" onclick="logout()" title="Log out">↩</button>
+        <button class="icon-btn" onclick="askLogout()" title="Log out">↩</button>
       </div>
     </header>
     <main class="content">${content}</main>
@@ -237,8 +238,9 @@ function adminShell(content) {
           <button class="side-item ${cur === v ? 'active' : ''}" onclick="go('${v}')">
             <span class="ic">${ic}</span>${lb}
             ${v === 'adminService' && openChats ? `<span class="side-badge">${openChats > 9 ? '9+' : openChats}</span>` : ''}
+            ${v === 'adminRequests' && state.pendingReq ? `<span class="side-badge">${state.pendingReq > 9 ? '9+' : state.pendingReq}</span>` : ''}
           </button>`).join('')}
-        <button class="side-item" onclick="logout()"><span class="ic">↩</span>Log out</button>
+        <button class="side-item" onclick="askLogout()"><span class="ic">↩</span>Log out</button>
       </div>
       <div class="side-foot">Smart Registrar v1.0 · LAN mode</div>
     </aside>
@@ -247,6 +249,8 @@ function adminShell(content) {
         <button class="icon-btn only-mobile" onclick="toggleSidebar()" title="Menu">☰</button>
         <div class="brand"><div class="brand-name">CDLSHS Smart Registrar</div></div>
         <div class="topbar-actions">
+          <button class="icon-btn" onclick="go('notifications')" title="Notifications">🔔
+            ${state.unread ? `<span class="badge-dot pill-count">${state.unread > 9 ? '9+' : state.unread}</span>` : ''}</button>
           <span class="admin-user">
             <span class="avatar">${((state.me?state.me.name:'').match(/\b\w/g)||['?']).slice(0,2).join('').toUpperCase()}</span>
             <span class="admin-user-name">${esc(state.me ? state.me.name : '')}</span>
@@ -260,7 +264,7 @@ function adminShell(content) {
       ${mobileNav.map(([v, ic, lb]) => v === '__menu'
         ? `<a href="javascript:void(0)" onclick="toggleSidebar()"><span class="ic">${ic}</span>${lb}</a>`
         : `<a class="${cur === v ? 'active' : ''}" onclick="go('${v}')" href="javascript:void(0)">
-            <span class="ic">${ic}</span>${lb}</a>`).join('')}
+            <span class="ic">${ic}${v === 'adminRequests' && state.pendingReq ? `<span class="badge-dot pill-count">${state.pendingReq > 9 ? '9+' : state.pendingReq}</span>` : ''}</span>${lb}</a>`).join('')}
     </nav>
   </div>`;
 }
@@ -273,6 +277,9 @@ async function updateUnread() {
     const r = await Api.get('/api/notifications/unread-count');
     state.unread = r.count;
   } catch (e) {}
+  if (state.me && state.me.role === 'admin') {
+    try { state.pendingReq = (await Api.get('/api/requests/pending-count')).count; } catch (e) {}
+  }
 }
 function paintUnread() {
   /* badge text is baked into HTML at render; nothing else needed */
@@ -427,6 +434,11 @@ async function doChangePasswordVerifyOtp(e) {
 
 function resendOtp() {
   toast('Please go back and submit the form again to request a new code.', 'info');
+}
+
+async function askLogout() {
+  const ok = await confirmDlg('Are you sure you want to log out?', 'Log out');
+  if (ok) logout();
 }
 
 function logout() {
@@ -773,6 +785,7 @@ async function setReqStatus(id, status) {
     await Api.put('/api/requests/' + id + '/status', { status });
     toast('Request marked as ' + status + '.');
     await loadView(state.view);
+    await updateUnread();
     render();
   } catch (err) { toast(err.message, 'error'); }
 }
@@ -1065,6 +1078,12 @@ setInterval(async () => {
     _notifSeen = r.count;
     if (r.count !== state.unread) { state.unread = r.count; render(); }
   } catch (e) {}
+  if (state.me.role === 'admin') {
+    try {
+      const pc = await Api.get('/api/requests/pending-count');
+      if (pc.count !== state.pendingReq) { state.pendingReq = pc.count; render(); }
+    } catch (e) {}
+  }
 }, 12000);
 
 boot();
