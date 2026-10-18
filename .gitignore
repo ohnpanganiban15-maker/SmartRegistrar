@@ -23,4 +23,3 @@ android/
 capacitor-cordova-android-plugins/
 local.properties
 *.log
-/downloads/
