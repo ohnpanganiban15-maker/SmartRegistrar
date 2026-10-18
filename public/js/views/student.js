@@ -67,14 +67,29 @@ function viewRegister() {
             </select></div>
           <div class="field"><label>Strand</label>
             <select class="input" id="rg-strand" onchange="toggleTvSpec()">
-              <option>STEM</option><option>ABM</option><option>HUMMS</option><option>TVL</option>
+              <option>STEM</option><option>ABM</option><option>HUMMS</option><option>TVL/TechPro</option>
             </select></div>
         </div>
         <div class="field" id="rg-spec-wrap" style="display:none">
-          <label>TVL Specialization</label>
+          <label>TVL/TechPro Track</label>
           <select class="input" id="rg-spec">
-            <option>PROGRAMMING</option><option>CSS</option><option>SMAW</option>
-            <option>COOKERY</option><option>EPAS</option><option>AS</option>
+            <option>Programming</option>
+            <option>Computer System Servicing (CSS)</option>
+            <option>Automotive Servicing (AS)</option>
+            <option>Electrical Installation &amp; Maintenance (EIM)</option>
+            <option>Electronic Products Assembly &amp; Servicing (EPAS)</option>
+            <option>Motorcycle Small Engine Servicing (MSES)</option>
+            <option>Shielded Metal Arc Welding (SMAW)</option>
+            <option>Cookery</option>
+            <option>Food and Beverages Servicing (FBS)</option>
+            <option>Bread and Pastry Production (BPP)</option>
+            <option>Dressmaking</option>
+            <option>Tailoring</option>
+            <option>Caregiving</option>
+            <option>Beauty &amp; Nail Care (BNC)</option>
+            <option>Wellness Massage</option>
+            <option>Housekeeping</option>
+            <option>Front Office Servicing (FOS)</option>
           </select>
         </div>
         <div class="field"><label>Contact Number</label>

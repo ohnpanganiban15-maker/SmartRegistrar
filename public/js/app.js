@@ -336,7 +336,7 @@ async function doLogin(e) {
 
 function toggleTvSpec() {
   const wrap = document.getElementById('rg-spec-wrap');
-  if (wrap) wrap.style.display = document.getElementById('rg-strand').value === 'TVL' ? '' : 'none';
+  if (wrap) wrap.style.display = document.getElementById('rg-strand').value === 'TVL/TechPro' ? '' : 'none';
 }
 
 async function doRegister(e) {
@@ -351,7 +351,7 @@ async function doRegister(e) {
     lastName: document.getElementById('rg-last').value.trim(),
     middleName: document.getElementById('rg-middle').value.trim(),
     gradeLevel: document.getElementById('rg-grade').value,
-    strand: (strandSel === 'TVL' && specEl) ? 'TVL - ' + specEl.value : strandSel,
+    strand: (strandSel === 'TVL/TechPro' && specEl) ? 'TVL/TechPro - ' + specEl.value : strandSel,
     contact: document.getElementById('rg-contact').value.trim(),
     password: document.getElementById('rg-pass').value
   };
