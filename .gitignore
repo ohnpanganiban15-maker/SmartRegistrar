@@ -19,7 +19,10 @@ database/*.bak*
 database/backups/
 backups/
 .env
-android/
+android/.gradle/
+android/build/
+android/app/build/
+android/app/src/main/assets/public/
 capacitor-cordova-android-plugins/
 local.properties
 *.log

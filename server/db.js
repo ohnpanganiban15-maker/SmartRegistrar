@@ -159,6 +159,7 @@ function ensureColumn(table, def) {
 ensureColumn('users', 'failed_attempts INTEGER NOT NULL DEFAULT 0');
 ensureColumn('users', "locked_until TEXT NOT NULL DEFAULT ''");
 ensureColumn('users', 'token_version INTEGER NOT NULL DEFAULT 0');
+ensureColumn('students', "profile_photo TEXT NOT NULL DEFAULT ''");
 
 /* ---- ensure required document types exist (safe on old + fresh DBs) ---- */
 const insertDocType = db.prepare('INSERT OR IGNORE INTO document_types (name) VALUES (?)');

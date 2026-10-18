@@ -74,7 +74,7 @@ const evalA = expr => w.eval(expr);
   const reg = async (first, last, email, num) => {
     const res = await fetch(BASE + '/api/auth/register', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ firstName: first, lastName: last, email, password: 'fix1234', studentNumber: num, gradeLevel: '12', strand: 'STEM' })
+      body: JSON.stringify({ firstName: first, lastName: last, email, password: 'fix12345', studentNumber: num, gradeLevel: '12', strand: 'STEM' })
     });
     if (res.status !== 201) return res.status;
     const data = await res.json();
@@ -89,7 +89,7 @@ const evalA = expr => w.eval(expr);
 
   /* --- student login --- */
   w.document.getElementById('li-email').value = em1;
-  w.document.getElementById('li-pass').value = 'fix1234';
+  w.document.getElementById('li-pass').value = 'fix12345';
   await w.doLogin({ preventDefault: () => {} });
   await sleep(100);
   assert(!$app().includes('Quick Actions'), 'student dashboard: Quick Actions removed');

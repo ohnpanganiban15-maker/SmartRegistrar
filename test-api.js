@@ -31,13 +31,13 @@ async function call(method, path, token, body) {
   const stuNum = 'S-2026-' + uniq.toUpperCase().slice(-6);
   r = await call('POST', '/api/auth/register', null, {
     firstName: 'Fixture', lastName: 'Student', email: stuEmail,
-    password: 'fix1234', studentNumber: stuNum, gradeLevel: '12', strand: 'STEM'
+    password: 'fix12345', studentNumber: stuNum, gradeLevel: '12', strand: 'STEM'
   });
   assert(r.status === 201 && r.data.devOtp, 'student self-register (OTP sent)');
   r = await call('POST', '/api/auth/register/verify-otp', null, { email: stuEmail, otp: r.data.devOtp });
   assert(r.status === 201, 'OTP verified → account created');
 
-  r = await call('POST', '/api/auth/login', null, { email: stuEmail, password: 'fix1234' });
+  r = await call('POST', '/api/auth/login', null, { email: stuEmail, password: 'fix12345' });
   assert(r.status === 200 && r.data.token && r.data.user.role === 'student', 'student login');
   const student = r.data.token;
 
@@ -55,13 +55,35 @@ async function call(method, path, token, body) {
   const test2Num = 'S-2026-T' + uniq.toUpperCase().slice(-6);
   r = await call('POST', '/api/auth/register', null, {
     firstName: 'Test', lastName: 'Student', email: test2Email,
-    password: 'test123', studentNumber: test2Num, gradeLevel: '12', strand: 'STEM'
+    password: 'test1234', studentNumber: test2Num, gradeLevel: '12', strand: 'STEM'
   });
   assert(r.status === 201 && r.data.devOtp, 'second register (OTP sent)');
   r = await call('POST', '/api/auth/register/verify-otp', null, { email: test2Email, otp: r.data.devOtp });
   assert(r.status === 201, 'second OTP verified');
-  r = await call('POST', '/api/auth/login', null, { email: test2Email, password: 'test123' });
+  r = await call('POST', '/api/auth/login', null, { email: test2Email, password: 'test1234' });
   assert(r.status === 200, 'new student can log in');
+
+  /* --- strong password rules --- */
+  r = await call('POST', '/api/auth/register', null, {
+    firstName: 'Weak', lastName: 'Password', email: 'weak.' + uniq + '@cdlshs.edu.ph',
+    password: '12345678', studentNumber: 'S-2026-W' + uniq.toUpperCase().slice(-6),
+    gradeLevel: '11', strand: 'STEM'
+  });
+  assert(r.status === 400, 'weak password (12345678) rejected');
+  r = await call('POST', '/api/auth/register', null, {
+    firstName: 'Shorty', lastName: 'McPass', email: 'shorty.' + uniq + '@cdlshs.edu.ph',
+    password: '123456', studentNumber: 'S-2026-X' + uniq.toUpperCase().slice(-6),
+    gradeLevel: '11', strand: 'STEM'
+  });
+  assert(r.status === 400, 'weak password (123456, 6 chars) rejected');
+
+  /* --- 1 Gmail = 1 account --- */
+  r = await call('POST', '/api/auth/register', null, {
+    firstName: 'Dup', lastName: 'Gmail', email: stuEmail,
+    password: 'fix12345', studentNumber: 'S-2026-D' + uniq.toUpperCase().slice(-6),
+    gradeLevel: '11', strand: 'STEM'
+  });
+  assert(r.status === 409, '1 Gmail = 1 account (duplicate email rejected)');
 
   /* --- slots --- */
   r = await call('GET', '/api/slots', student);
@@ -200,7 +222,7 @@ async function call(method, path, token, body) {
   const lockEmail = 'lock.test.' + uniq + '@cdlshs.edu.ph';
   r = await call('POST', '/api/auth/register', null, {
     firstName: 'Lock', lastName: 'Tester', email: lockEmail,
-    password: 'lock123', studentNumber: 'S-2026-L' + uniq.toUpperCase().slice(-6),
+    password: 'lock1234', studentNumber: 'S-2026-L' + uniq.toUpperCase().slice(-6),
     gradeLevel: '12', strand: 'STEM'
   });
   assert(r.status === 201 && r.data.devOtp, 'lockout test account register (OTP sent)');
@@ -210,15 +232,15 @@ async function call(method, path, token, body) {
     r = await call('POST', '/api/auth/login', null, { email: lockEmail, password: 'wrong-pass-' + i });
   }
   assert(r.status === 429, 'account locked after 5 failed logins');
-  r = await call('POST', '/api/auth/login', null, { email: lockEmail, password: 'lock123' });
+  r = await call('POST', '/api/auth/login', null, { email: lockEmail, password: 'lock1234' });
   assert(r.status === 429, 'locked account rejected even with correct password');
 
   /* --- safety: change password (OTP flow) + session invalidation --- */
   r = await call('POST', '/api/auth/change-password/request-otp', student, { currentPassword: 'wrong', newPassword: 'newpass1' });
   assert(r.status === 400, 'change-password rejects wrong current password');
-  r = await call('POST', '/api/auth/change-password/request-otp', student, { currentPassword: 'fix1234', newPassword: 'abc' });
+  r = await call('POST', '/api/auth/change-password/request-otp', student, { currentPassword: 'fix12345', newPassword: 'abc' });
   assert(r.status === 400, 'change-password rejects short new password');
-  r = await call('POST', '/api/auth/change-password/request-otp', student, { currentPassword: 'fix1234', newPassword: 'newpass1' });
+  r = await call('POST', '/api/auth/change-password/request-otp', student, { currentPassword: 'fix12345', newPassword: 'newpass1' });
   assert(r.status === 200 && r.data.devOtp, 'change-password OTP sent (dev)');
   r = await call('POST', '/api/auth/change-password/verify-otp', student, { otp: r.data.devOtp });
   assert(r.status === 200 && r.data.token, 'change-password OTP verified, fresh token issued');
@@ -227,11 +249,21 @@ async function call(method, path, token, body) {
   assert(r.status === 401, 'old session invalidated after password change');
   r = await call('GET', '/api/auth/me', student2token);
   assert(r.status === 200, 'fresh token works after password change');
-  r = await call('POST', '/api/auth/login', null, { email: stuEmail, password: 'fix1234' });
+  r = await call('POST', '/api/auth/login', null, { email: stuEmail, password: 'fix12345' });
   assert(r.status === 401, 'old password no longer works');
   r = await call('POST', '/api/auth/login', null, { email: stuEmail, password: 'newpass1' });
   assert(r.status === 200, 'login works with the new password');
   const stuFresh = r.data.token;
+
+  /* --- profile photo --- */
+  r = await call('PUT', '/api/students/me/photo', stuFresh, { photo: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==' });
+  assert(r.status === 200 && r.data.profile_photo, 'student uploads profile photo');
+  r = await call('GET', '/api/auth/me', stuFresh);
+  assert(r.status === 200 && r.data.student && r.data.student.profile_photo, 'photo visible in /me');
+  r = await call('PUT', '/api/students/me/photo', stuFresh, { photo: 'not-an-image' });
+  assert(r.status === 400, 'invalid photo rejected');
+  r = await call('PUT', '/api/students/me/photo', admin, { photo: 'data:image/png;base64,AAA=' });
+  assert(r.status === 403, 'admin cannot use student photo endpoint');
 
   /* --- safety: CSV export + backup --- */
   r = await call('GET', '/api/export/students', admin);
@@ -252,11 +284,11 @@ async function call(method, path, token, body) {
   /* --- safety: restore original password so runs stay repeatable --- */
   r = await call('POST', '/api/auth/change-password/request-otp', stuFresh, { currentPassword: 'newpass1', newPassword: 'newpass1' });
   assert(r.status === 400, 'change-password rejects same password');
-  r = await call('POST', '/api/auth/change-password/request-otp', stuFresh, { currentPassword: 'newpass1', newPassword: 'fix1234' });
+  r = await call('POST', '/api/auth/change-password/request-otp', stuFresh, { currentPassword: 'newpass1', newPassword: 'fix12345' });
   assert(r.status === 200 && r.data.devOtp, 'restore password OTP sent');
   r = await call('POST', '/api/auth/change-password/verify-otp', stuFresh, { otp: r.data.devOtp });
   assert(r.status === 200, 'password restored for next test run');
-  r = await call('POST', '/api/auth/login', null, { email: stuEmail, password: 'fix1234' });
+  r = await call('POST', '/api/auth/login', null, { email: stuEmail, password: 'fix12345' });
   assert(r.status === 200 && r.data.token, 'original login restored');
 
   /* --- unknown route --- */

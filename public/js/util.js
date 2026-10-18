@@ -48,6 +48,23 @@ function initials(name) {
   return String(name || '?').split(/\s+/).map(w => w[0]).slice(0, 2).join('').toUpperCase();
 }
 
+/* strong-password rules — shared with the server (server/routes/auth.js) */
+function passwordIssue(pw) {
+  pw = String(pw || '');
+  if (pw.length < 8) return 'Password must be at least 8 characters.';
+  if (!/[a-zA-Z]/.test(pw) || !/[0-9]/.test(pw)) return 'Password must contain both letters and numbers.';
+  const low = pw.toLowerCase();
+  const common = ['12345678', '123456789', '1234567890', 'password', 'password1', 'password123',
+    'qwerty123', 'qwertyuiop', 'abc123456', 'abcd1234', 'iloveyou', 'admin123', 'letmein',
+    'welcome1', 'welcome123', 'monkey123', 'football', 'baseball', 'princess', 'sunshine',
+    'master123', 'dragon123', 'trustno1', 'starwars', 'passw0rd', 'p@ssw0rd', '00000000',
+    '11111111', 'aaaaaaaa', '1q2w3e4r', 'zaq12wsx', 'asdfghjkl', 'qazwsxedc'];
+  if (common.indexOf(low) !== -1) return 'That password is too common — choose a stronger one.';
+  if (/^(?:0123456789|1234567890|abcdefghij|abcdefgh|qwertyuiop)/.test(low)) return 'Avoid simple sequences like 12345678 — choose a stronger one.';
+  if (/^(.)\1+$/.test(pw)) return 'Avoid repeating the same character — choose a stronger one.';
+  return '';
+}
+
 /* status → css class (lowercased, spaces→dash) */
 function statusClass(s) {
   return 'st-' + String(s || '').toLowerCase().replace(/\s+/g, '-');

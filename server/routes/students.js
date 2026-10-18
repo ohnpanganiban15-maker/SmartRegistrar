@@ -6,6 +6,30 @@ const { q, logActivity } = require('../db');
 const { requireAuth, requireAdmin, validateBody } = require('../auth');
 
 const router = express.Router();
+
+/* ---- student self-service (BEFORE the admin middleware below) ---- */
+
+/* PUT /api/students/me/photo — student uploads own profile picture (base64 data URL) */
+router.put('/me/photo', requireAuth, (req, res) => {
+  if (req.user.role !== 'student' || !req.user.studentId) {
+    return res.status(403).json({ error: 'Only students can upload a profile picture' });
+  }
+  const { photo } = req.body || {};
+  if (!photo) {
+    q.run("UPDATE students SET profile_photo='' WHERE id=?", req.user.studentId);
+    return res.json({ message: 'Photo removed', profile_photo: '' });
+  }
+  if (typeof photo !== 'string' || !/^data:image\/(png|jpe?g|webp|gif);base64,/.test(photo)) {
+    return res.status(400).json({ error: 'Please upload a valid image file' });
+  }
+  if (photo.length > 1500000) {
+    return res.status(400).json({ error: 'Image is too large — maximum 1.5 MB' });
+  }
+  q.run('UPDATE students SET profile_photo=? WHERE id=?', photo, req.user.studentId);
+  logActivity(req.user.id, req.user.name, 'UPDATE_PHOTO', 'profile picture updated');
+  res.json({ message: 'Profile picture saved', profile_photo: photo });
+});
+
 router.use(requireAuth, requireAdmin);
 
 /* GET /api/students?search=&grade=&status= */
@@ -30,7 +54,7 @@ router.post('/', (req, res) => {
   const b = req.body || {};
   if (!validateBody(res, b, ['firstName', 'lastName', 'studentNumber'])) return;
   if (q.get('SELECT id FROM students WHERE student_number = ?', String(b.studentNumber).trim())) {
-    return res.status(409).json({ error: 'Student number already exists' });
+    return res.status(409).json({ error: 'LRN already exists' });
   }
   const r = q.run(
     'INSERT INTO students (student_number, first_name, middle_name, last_name, grade_level, strand, contact, email, status) VALUES (?,?,?,?,?,?,?,?,?)',
@@ -49,7 +73,7 @@ router.put('/:id', (req, res) => {
   const s = q.get('SELECT * FROM students WHERE id = ?', req.params.id);
   if (!s) return res.status(404).json({ error: 'Student not found' });
   if (b.studentNumber && q.get('SELECT id FROM students WHERE student_number = ? AND id != ?', String(b.studentNumber).trim(), s.id)) {
-    return res.status(409).json({ error: 'Student number already exists' });
+    return res.status(409).json({ error: 'LRN already exists' });
   }
   q.run(
     `UPDATE students SET student_number=?, first_name=?, middle_name=?, last_name=?, grade_level=?, strand=?, contact=?, email=?, status=? WHERE id=?`,

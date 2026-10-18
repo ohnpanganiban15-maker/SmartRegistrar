@@ -92,10 +92,10 @@ function viewAdminStudents() {
   </div>
   ${list.length === 0 ? '<div class="card empty"><div class="big">👥</div>No students found.</div>' : `
   <div class="table-wrap"><table class="rtable">
-    <thead><tr><th>Student No.</th><th>Name</th><th>Grade</th><th>Strand</th><th>Contact</th><th>Status</th><th>Actions</th></tr></thead>
+    <thead><tr><th>LRN</th><th>Name</th><th>Grade</th><th>Strand</th><th>Contact</th><th>Status</th><th>Actions</th></tr></thead>
     <tbody>${list.map(s => `
       <tr>
-        <td data-label="Student No." class="mono">${esc(s.student_number)}</td>
+        <td data-label="LRN" class="mono">${esc(s.student_number)}</td>
         <td data-label="Name"><b>${esc(s.first_name + ' ' + s.last_name)}</b></td>
         <td data-label="Grade">${esc(s.grade_level)}</td>
         <td data-label="Strand">${esc(s.strand)}</td>
@@ -121,7 +121,7 @@ function studentFormHTML(s) {
   <div class="modal-body">
     <div id="sf-error"></div>
     <div class="form-row">
-      <div class="field"><label>Student Number *</label>
+      <div class="field"><label>LRN *</label>
         <input class="input" id="sf-num" value="${esc(s.student_number || '')}" required></div>
       <div class="field"><label>Email</label>
         <input class="input" id="sf-email" type="email" value="${esc(s.email || '')}"></div>

@@ -57,6 +57,23 @@ function canSendOtp(email, purpose) {
   return n < 3;
 }
 
+/* strong-password rules — shared with the client (public/js/util.js) */
+function passwordIssue(pw) {
+  pw = String(pw || '');
+  if (pw.length < 8) return 'Password must be at least 8 characters.';
+  if (!/[a-zA-Z]/.test(pw) || !/[0-9]/.test(pw)) return 'Password must contain both letters and numbers.';
+  const low = pw.toLowerCase();
+  const common = ['12345678', '123456789', '1234567890', 'password', 'password1', 'password123',
+    'qwerty123', 'qwertyuiop', 'abc123456', 'abcd1234', 'iloveyou', 'admin123', 'letmein',
+    'welcome1', 'welcome123', 'monkey123', 'football', 'baseball', 'princess', 'sunshine',
+    'master123', 'dragon123', 'trustno1', 'starwars', 'passw0rd', 'p@ssw0rd', '00000000',
+    '11111111', 'aaaaaaaa', '1q2w3e4r', 'zaq12wsx', 'asdfghjkl', 'qazwsxedc'];
+  if (common.indexOf(low) !== -1) return 'That password is too common — choose a stronger one.';
+  if (/^(?:0123456789|1234567890|abcdefghij|abcdefgh|qwertyuiop)/.test(low)) return 'Avoid simple sequences like 12345678 — choose a stronger one.';
+  if (/^(.)\1+$/.test(pw)) return 'Avoid repeating the same character — choose a stronger one.';
+  return '';
+}
+
 /* POST /api/auth/login */
 router.post('/login', (req, res) => {
   const { email, password } = req.body || {};
@@ -105,15 +122,14 @@ router.post('/login', (req, res) => {
 router.post('/register', async (req, res) => {
   const b = req.body || {};
   if (!validateBody(res, b, ['firstName', 'lastName', 'email', 'password', 'studentNumber'])) return;
-  if (String(b.password).length < 6) {
-    return res.status(400).json({ error: 'Password must be at least 6 characters' });
-  }
+  const weak = passwordIssue(b.password);
+  if (weak) return res.status(400).json({ error: weak });
   const email = String(b.email).toLowerCase().trim();
   if (q.get('SELECT id FROM users WHERE email = ?', email)) {
-    return res.status(409).json({ error: 'An account with this email already exists' });
+    return res.status(409).json({ error: 'This Gmail is already registered — 1 Gmail can only have 1 account.' });
   }
   if (q.get('SELECT id FROM students WHERE student_number = ?', String(b.studentNumber).trim())) {
-    return res.status(409).json({ error: 'This Student Number is already registered' });
+    return res.status(409).json({ error: 'This LRN is already registered' });
   }
   if (!canSendOtp(email, 'register')) {
     return res.status(429).json({ error: 'Too many OTP requests. Please wait 15 minutes.' });
@@ -150,10 +166,10 @@ router.post('/register/verify-otp', (req, res) => {
 
   const p = result.payload;
   if (q.get('SELECT id FROM users WHERE email = ?', email)) {
-    return res.status(409).json({ error: 'An account with this email already exists' });
+    return res.status(409).json({ error: 'This Gmail is already registered — 1 Gmail can only have 1 account.' });
   }
   if (q.get('SELECT id FROM students WHERE student_number = ?', p.studentNumber)) {
-    return res.status(409).json({ error: 'This Student Number is already registered' });
+    return res.status(409).json({ error: 'This LRN is already registered' });
   }
 
   const r1 = q.run(
@@ -184,9 +200,8 @@ router.post('/change-password/request-otp', requireAuth, async (req, res) => {
   if (!verifyPassword(b.currentPassword, user.password_hash)) {
     return res.status(400).json({ error: 'Current password is incorrect' });
   }
-  if (String(b.newPassword).length < 6) {
-    return res.status(400).json({ error: 'New password must be at least 6 characters' });
-  }
+  const weakNew = passwordIssue(b.newPassword);
+  if (weakNew) return res.status(400).json({ error: weakNew });
   if (String(b.newPassword) === String(b.currentPassword)) {
     return res.status(400).json({ error: 'New password must be different from the current one' });
   }
@@ -229,7 +244,7 @@ router.get('/me', requireAuth, (req, res) => {
   const out = { id: user.id, name: user.name, email: user.email, role: user.role, studentId: user.student_id };
   if (user.student_id) {
     out.student = q.get(
-      'SELECT id, student_number, first_name, middle_name, last_name, grade_level, strand, contact, email, status FROM students WHERE id = ?',
+      'SELECT id, student_number, first_name, middle_name, last_name, grade_level, strand, contact, email, status, profile_photo FROM students WHERE id = ?',
       user.student_id
     );
   }

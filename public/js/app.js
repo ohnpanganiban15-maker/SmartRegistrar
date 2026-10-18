@@ -355,6 +355,8 @@ async function doRegister(e) {
     contact: document.getElementById('rg-contact').value.trim(),
     password: document.getElementById('rg-pass').value
   };
+  const weak = passwordIssue(body.password);
+  if (weak) { state.error = weak; return render(); }
   try {
     const data = await Api.post('/api/auth/register', body);
     state.otpPurpose = 'register';
@@ -391,6 +393,8 @@ async function doChangePasswordRequestOtp(e) {
   const newPassword = document.getElementById('cp-new').value;
   const confirm = document.getElementById('cp-confirm').value;
   if (newPassword !== confirm) { state.error = 'Passwords do not match'; return render(); }
+  const weak = passwordIssue(newPassword);
+  if (weak) { state.error = weak; return render(); }
   try {
     const data = await Api.post('/api/auth/change-password/request-otp', { currentPassword, newPassword });
     state.otpPurpose = 'change_password';
@@ -632,7 +636,7 @@ async function saveStudent(id) {
   if (acct && acct.value) body.accountStatus = acct.value;
   if (!body.studentNumber || !body.firstName || !body.lastName) {
     document.getElementById('sf-error').innerHTML =
-      '<div class="error-box">Student number, first name and last name are required.</div>';
+      '<div class="error-box">LRN, first name and last name are required.</div>';
     return;
   }
   try {
@@ -668,7 +672,7 @@ async function viewStudentProfile(id) {
         <button class="modal-x" onclick="closeModal()">✕</button>
       </div>
       <div class="modal-body">
-        <div class="kv"><span class="k">Student No.</span><span class="v mono">${esc(s.student_number)}</span></div>
+        <div class="kv"><span class="k">LRN</span><span class="v mono">${esc(s.student_number)}</span></div>
         <div class="kv"><span class="k">Grade</span><span class="v">${esc(s.grade_level || '—')}</span></div>
         <div class="kv"><span class="k">Strand</span><span class="v">${esc(s.strand || '—')}</span></div>
         <div class="kv"><span class="k">Contact</span><span class="v">${esc(s.contact || '—')}</span></div>
@@ -986,6 +990,43 @@ async function saveServerAddress() {
     document.getElementById('setup-error').innerHTML =
       '<div class="error-box">Cannot connect: ' + esc(e.message) +
       ' — check the address and your internet connection.</div>';
+  }
+}
+
+/* ---------- student profile picture ---------- */
+async function uploadProfilePhoto(input) {
+  const file = input.files && input.files[0];
+  if (!file) return;
+  if (!file.type.startsWith('image/')) { toast('Please choose an image file.', 'error'); return; }
+  try {
+    const dataUrl = await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = () => reject(new Error('Could not read the file'));
+      reader.readAsDataURL(file);
+    });
+    const img = await new Promise((resolve, reject) => {
+      const i = new Image();
+      i.onload = () => resolve(i);
+      i.onerror = () => reject(new Error('Could not load the image'));
+      i.src = dataUrl;
+    });
+    /* resize to max 320x320 JPEG to keep it light */
+    const max = 320;
+    let w = img.width, h = img.height;
+    if (w > max || h > max) { const r = Math.min(max / w, max / h); w = Math.round(w * r); h = Math.round(h * r); }
+    const canvas = document.createElement('canvas');
+    canvas.width = w; canvas.height = h;
+    canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+    const photo = canvas.toDataURL('image/jpeg', 0.82);
+    const r = await Api.put('/api/students/me/photo', { photo });
+    if (state.me && state.me.student) state.me.student.profile_photo = r.profile_photo;
+    toast('Profile picture saved!');
+    render();
+  } catch (err) {
+    toast(err.message, 'error');
+  } finally {
+    input.value = '';
   }
 }
 

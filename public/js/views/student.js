@@ -49,8 +49,8 @@ function viewRegister() {
       ${state.error ? `<div class="form-error">${esc(state.error)}</div>` : ''}
       <form onsubmit="doRegister(event)">
         <div class="form-row">
-          <div class="field"><label>Student Number</label>
-            <input class="input" id="rg-num" placeholder="S-2026-00121" required></div>
+          <div class="field"><label>LRN</label>
+            <input class="input" id="rg-num" placeholder="12-digit Learner Reference Number" required></div>
           <div class="field"><label>Email</label>
             <input class="input" id="rg-email" type="email" placeholder="you@cdlshs.edu.ph" required></div>
         </div>
@@ -95,7 +95,7 @@ function viewRegister() {
         <div class="field"><label>Contact Number</label>
           <input class="input" id="rg-contact" placeholder="09XX XXX XXXX"></div>
         <div class="field"><label>Password</label>
-          <input class="input" id="rg-pass" type="password" minlength="6" placeholder="at least 6 characters" required></div>
+          <input class="input" id="rg-pass" type="password" minlength="8" placeholder="at least 8 characters + letters &amp; numbers" required></div>
         <button class="btn btn-primary btn-block" type="submit">Create account</button>
       </form>
       <div class="auth-switch">Already registered? <a onclick="go('login')">Sign in</a></div>
@@ -155,7 +155,7 @@ function viewChangePassword() {
         <div class="field"><label>Current Password</label>
           <input class="input" id="cp-current" type="password" autocomplete="current-password" required></div>
         <div class="field"><label>New Password</label>
-          <input class="input" id="cp-new" type="password" minlength="6" autocomplete="new-password" placeholder="at least 6 characters" required></div>
+          <input class="input" id="cp-new" type="password" minlength="8" autocomplete="new-password" placeholder="at least 8 characters + letters &amp; numbers" required></div>
         <div class="field"><label>Confirm New Password</label>
           <input class="input" id="cp-confirm" type="password" minlength="6" autocomplete="new-password" required></div>
         <button class="btn btn-primary btn-block" type="submit">Send OTP &amp; Continue</button>
@@ -448,18 +448,25 @@ function viewMyQr() {
 function viewProfile() {
   const me = state.me || {};
   const st = me.student || {};
+  const avatar = st.profile_photo
+    ? `<img src="${st.profile_photo}" alt="Profile" style="width:64px;height:64px;border-radius:50%;object-fit:cover;border:2px solid var(--border);">`
+    : initials(st.first_name ? st.first_name + ' ' + st.last_name : me.name);
   return `
   <div class="page-head"><h2>My Profile</h2>${themeBtnHTML()}</div>
   <div class="panel">
-    <div class="flex" style="gap:14px;">
-      <div class="auth-badge" style="margin:0;">${initials(st.first_name ? st.first_name + ' ' + st.last_name : me.name)}</div>
+    <div class="flex" style="gap:14px;align-items:center;">
+      <div class="auth-badge" style="margin:0;overflow:hidden;">${avatar}</div>
       <div>
         <h3>${esc(st.first_name ? [st.first_name, st.middle_name, st.last_name].filter(Boolean).join(' ') : me.name)}</h3>
         <div class="muted small">${esc(me.email)}</div>
+        <label class="btn btn-outline btn-sm mt-8" style="display:inline-block;cursor:pointer;">
+          📷 ${st.profile_photo ? 'Change photo' : 'Add photo'}
+          <input type="file" accept="image/*" style="display:none;" onchange="uploadProfilePhoto(this)">
+        </label>
       </div>
     </div>
     <hr class="hr">
-    <div class="kv"><span class="k">Student No.</span><span class="v mono">${esc(st.student_number || '—')}</span></div>
+    <div class="kv"><span class="k">LRN</span><span class="v mono">${esc(st.student_number || '—')}</span></div>
     <div class="kv"><span class="k">Grade / Level</span><span class="v">${esc(st.grade_level || '—')}</span></div>
     <div class="kv"><span class="k">Strand</span><span class="v">${esc(st.strand || '—')}</span></div>
     <div class="kv"><span class="k">Contact</span><span class="v">${esc(st.contact || '—')}</span></div>
