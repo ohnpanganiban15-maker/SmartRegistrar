@@ -101,6 +101,11 @@ function viewOtp() {
         <p>We sent a 6-digit code to<br><strong>${esc(state.otpEmail || 'your email')}</strong></p>
       </div>
       ${state.error ? `<div class="form-error">${esc(state.error)}</div>` : ''}
+      ${state.devOtp ? `
+        <div style="background:#FFF7E0;border:1.5px solid #E6B800;border-radius:10px;padding:10px 14px;margin-bottom:12px;text-align:center;">
+          <span class="muted small">DEV MODE (Gmail not set) — your code:</span><br>
+          <strong style="font-size:26px;letter-spacing:8px;">${esc(state.devOtp)}</strong>
+        </div>` : ''}
       <form onsubmit="${isRegister ? 'doVerifyRegisterOtp(event)' : 'doChangePasswordVerifyOtp(event)'}">
         <div class="field">
           <label>One-Time Password (OTP)</label>

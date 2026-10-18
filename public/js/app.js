@@ -19,7 +19,7 @@ const state = {
   reqAdminFilter: { search: '', status: '' },
   unread: 0,
   sidebarOpen: false,
-  otpPurpose: '', otpEmail: ''
+  otpPurpose: '', otpEmail: '', devOtp: ''
 };
 
 const VIEWS = {
@@ -356,9 +356,10 @@ async function doRegister(e) {
     password: document.getElementById('rg-pass').value
   };
   try {
-    await Api.post('/api/auth/register', body);
+    const data = await Api.post('/api/auth/register', body);
     state.otpPurpose = 'register';
     state.otpEmail = body.email;
+    state.devOtp = (data && data.devOtp) || '';
     state.error = '';
     go('otp');
   } catch (err) {
@@ -375,7 +376,7 @@ async function doVerifyRegisterOtp(e) {
   try {
     await Api.post('/api/auth/register/verify-otp', { email: state.otpEmail, otp: code });
     toast('Account created — you can now sign in.');
-    state.error = ''; state.otpPurpose = ''; state.otpEmail = '';
+    state.error = ''; state.otpPurpose = ''; state.otpEmail = ''; state.devOtp = '';
     go('login');
   } catch (err) {
     state.error = err.message;
@@ -391,9 +392,10 @@ async function doChangePasswordRequestOtp(e) {
   const confirm = document.getElementById('cp-confirm').value;
   if (newPassword !== confirm) { state.error = 'Passwords do not match'; return render(); }
   try {
-    await Api.post('/api/auth/change-password/request-otp', { currentPassword, newPassword });
+    const data = await Api.post('/api/auth/change-password/request-otp', { currentPassword, newPassword });
     state.otpPurpose = 'change_password';
     state.otpEmail = state.me ? state.me.email : '';
+    state.devOtp = (data && data.devOtp) || '';
     state.error = '';
     go('otp');
   } catch (err) {
@@ -411,7 +413,7 @@ async function doChangePasswordVerifyOtp(e) {
     const data = await Api.post('/api/auth/change-password/verify-otp', { otp: code });
     if (data.token) Api.saveSession(data.token, state.me);
     toast('Password changed successfully.');
-    state.error = ''; state.otpPurpose = ''; state.otpEmail = '';
+    state.error = ''; state.otpPurpose = ''; state.otpEmail = ''; state.devOtp = '';
     go('profile');
   } catch (err) {
     state.error = err.message;
