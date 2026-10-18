@@ -969,8 +969,10 @@ function viewSetup() {
   </div>`;
 }
 async function saveServerAddress() {
-  const url = document.getElementById('setup-url').value.trim();
+  let url = document.getElementById('setup-url').value.trim();
   if (!url) { toast('Enter the server address.', 'error'); return; }
+  if (!/^https?:\/\//i.test(url)) url = 'https://' + url.replace(/^\/+/, '');
+  url = url.replace(/\/+$/, '');
   localStorage.setItem('apiLastTried', url);
   Api.base = url;
   try {
