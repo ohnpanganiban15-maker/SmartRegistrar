@@ -959,10 +959,10 @@ function viewSetup() {
       <div id="setup-error"></div>
       <div class="field">
         <label>Server address</label>
-        <input class="input" id="setup-url" placeholder="http://192.168.1.100:3000"
-          value="${esc(localStorage.getItem('apiLastTried') || '')}">
-        <div class="form-hint">Ask the registrar for the server address, e.g.
-          <span class="mono">http://192.168.1.100:3000</span>. All devices must be on the same Wi-Fi.</div>
+        <input class="input" id="setup-url" placeholder="https://smart-registrar.onrender.com"
+          value="${esc(localStorage.getItem('apiLastTried') || Api.defaultServer)}">
+        <div class="form-hint">Works anywhere with internet, e.g.
+          <span class="mono">https://smart-registrar.onrender.com</span>. Leave as-is if unsure.</div>
       </div>
       <button class="btn btn-primary btn-block" onclick="saveServerAddress()">Connect</button>
     </div>
@@ -983,7 +983,7 @@ async function saveServerAddress() {
     Api.base = '';
     document.getElementById('setup-error').innerHTML =
       '<div class="error-box">Cannot connect: ' + esc(e.message) +
-      ' — check the address, make sure the server PC is on, and both devices share the same Wi-Fi.</div>';
+      ' — check the address and your internet connection.</div>';
   }
 }
 

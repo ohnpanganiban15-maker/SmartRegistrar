@@ -8,6 +8,8 @@
      e.g. http://192.168.1.100:3000
 ===================================================== */
 const Api = {
+  /* default server baked into the app — APK connects here automatically */
+  defaultServer: 'https://smart-registrar.onrender.com',
   get base() {
     return localStorage.getItem('apiBase') || '';
   },
@@ -16,13 +18,17 @@ const Api = {
   },
 
   /* true when the page needs a server address entered:
-     - native APK build (Capacitor) — always ask once, or
-     - non-http(s) origin (file://) with no address configured yet */
+     - native APK build (Capacitor) — auto-uses the default server;
+       the setup screen only appears if the server is unreachable
+       or the user wants to change the address */
   needsServerAddress() {
     if (this.base) return false;
     const native = typeof window !== 'undefined' && window.Capacitor &&
       typeof window.Capacitor.isNativePlatform === 'function' && window.Capacitor.isNativePlatform();
-    if (native) return true;
+    if (native) {
+      this.base = this.defaultServer;
+      return false;
+    }
     return location.protocol !== 'http:' && location.protocol !== 'https:';
   },
 
