@@ -71,9 +71,9 @@ function seed() {
   /* ---- document types ---- */
   const docTypes = [
     'Certificate of Enrollment', 'Transcript of Records', 'Good Moral Certificate',
-    'Diploma', 'Form 137', 'Form 138', 'Certification', 'Other Registrar Documents'
+    'Diploma', 'Form 137', 'Form 138', 'SF9', 'SF10', 'Certification', 'Other Registrar Documents'
   ];
-  for (const name of docTypes) q.run('INSERT INTO document_types (name) VALUES (?)', name);
+  for (const name of docTypes) q.run('INSERT OR IGNORE INTO document_types (name) VALUES (?)', name);
 
   /* ---- appointment slots: 14 weekdays, 3 slots each ---- */
   const dates = nextWeekdays(14);

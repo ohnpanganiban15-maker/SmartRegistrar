@@ -485,7 +485,8 @@ function openRequestForm() {
     ? state.docTypes
     : [{ name: 'Certificate of Enrollment' }, { name: 'Transcript of Records' },
        { name: 'Good Moral Certificate' }, { name: 'Diploma' }, { name: 'Form 137' },
-       { name: 'Form 138' }, { name: 'Certification' }, { name: 'Other Registrar Documents' }];
+       { name: 'Form 138' }, { name: 'SF9' }, { name: 'SF10' },
+       { name: 'Certification' }, { name: 'Other Registrar Documents' }];
   openModal(`
     <div class="modal-head">
       <div class="modal-title">New Document Request</div>
@@ -497,12 +498,8 @@ function openRequestForm() {
         <select class="input" id="rf-type">
           ${types.map(t => `<option>${esc(t.name)}</option>`).join('')}
         </select></div>
-      <div class="form-row">
-        <div class="field"><label>Quantity</label>
-          <input class="input" id="rf-qty" type="number" min="1" max="50" value="1"></div>
-        <div class="field"><label>Preferred pickup date</label>
-          <input class="input" id="rf-pickup" type="date" min="${todayISO()}"></div>
-      </div>
+      <div class="field"><label>Quantity</label>
+        <input class="input" id="rf-qty" type="number" min="1" max="50" value="1"></div>
       <div class="field"><label>Purpose *</label>
         <input class="input" id="rf-purpose" placeholder="e.g., College application" required></div>
       <div class="field"><label>Additional information</label>
@@ -517,7 +514,6 @@ async function submitRequest() {
   const body = {
     docType: document.getElementById('rf-type').value,
     quantity: parseInt(document.getElementById('rf-qty').value, 10) || 1,
-    pickupDate: document.getElementById('rf-pickup').value,
     purpose: document.getElementById('rf-purpose').value.trim(),
     notes: document.getElementById('rf-notes').value.trim()
   };

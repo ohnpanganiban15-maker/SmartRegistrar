@@ -340,7 +340,7 @@ function viewMyRequests() {
         <span class="muted small">${fmtDateShort(String(r.created_at).slice(0, 10))}</span>
       </div>
       <div class="mt-8"><b>${esc(r.doc_type)}</b> × ${r.quantity}</div>
-      <div class="muted small">Purpose: ${esc(r.purpose || '—')}${r.pickup_date ? ' · Preferred pickup: ' + fmtDateShort(r.pickup_date) : ''}</div>
+      <div class="muted small">Purpose: ${esc(r.purpose || '—')}${r.pickup_date ? ' · Pickup: ' + fmtDateShort(r.pickup_date) : ''}</div>
       ${r.notes ? `<div class="small mt-8">Notes: ${esc(r.notes)}</div>` : ''}
       <div class="flex mt-14">
         <button class="btn btn-sm btn-outline" onclick="showQr('${esc(r.ref)}')">Show QR</button>

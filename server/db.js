@@ -160,6 +160,10 @@ ensureColumn('users', 'failed_attempts INTEGER NOT NULL DEFAULT 0');
 ensureColumn('users', "locked_until TEXT NOT NULL DEFAULT ''");
 ensureColumn('users', 'token_version INTEGER NOT NULL DEFAULT 0');
 
+/* ---- ensure required document types exist (safe on old + fresh DBs) ---- */
+const insertDocType = db.prepare('INSERT OR IGNORE INTO document_types (name) VALUES (?)');
+for (const t of ['SF9', 'SF10']) insertDocType.run(t);
+
 /* ---- small query helpers used by all routes ---- */
 const q = {
   get: (sql, ...params) => db.prepare(sql).get(...params),
