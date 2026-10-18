@@ -1,0 +1,26 @@
+# ===== Smart Registrar configuration =====
+# Copy this file to ".env" and adjust the values if needed.
+
+# Port the server listens on (frontend opens at http://<PC-IP>:PORT)
+PORT=3000
+
+# Address to bind. 0.0.0.0 = reachable from other devices on the Wi-Fi network
+HOST=0.0.0.0
+
+# Secret used to sign login tokens. CHANGE THIS to any random text.
+JWT_SECRET=change-me-to-a-long-random-secret
+
+# SQLite database file (created automatically on first run)
+DB_PATH=./database/smart-registrar.db
+
+node_modules/
+database/*.db
+database/*.bak*
+database/backups/
+backups/
+.env
+android/
+capacitor-cordova-android-plugins/
+local.properties
+*.log
+/downloads/

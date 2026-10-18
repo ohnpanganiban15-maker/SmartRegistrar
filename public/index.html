@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#0F4C81">
+  <title>CDLSHS Smart Registrar</title>
+  <link rel="icon" type="image/jpeg" href="assets/logo.jpg">
+  <script>
+    /* restore theme before first paint (no flash) */
+    try { document.documentElement.setAttribute('data-theme', localStorage.getItem('cdlshs_theme') || 'light'); } catch (e) {}
+  </script>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div id="app" aria-live="polite"></div>
+  <div id="modal-root"></div>
+  <div id="toast-root" aria-live="assertive"></div>
+
+  <!-- animated welcome intro (plays on every app open) -->
+  <div id="intro-splash" class="intro-splash">
+    <div class="intro-inner">
+      <img class="intro-logo" src="assets/logo.jpg" alt="">
+      <div class="intro-welcome" data-text="WELCOME"></div>
+      <div class="intro-name" data-text="CRECENCIAN"></div>
+      <div class="intro-sub">CDLSHS SMART REGISTRAR</div>
+    </div>
+    <div class="intro-hint">tap anywhere to skip</div>
+  </div>
+  <script>
+    /* build the letter-by-letter animation, then auto-close the intro */
+    (function () {
+      var el = document.getElementById('intro-splash');
+      if (!el) return;
+      var i = 0;
+      try {
+        var nodes = el.querySelectorAll('[data-text]');
+        for (var n = 0; n < nodes.length; n++) {
+          var txt = nodes[n].getAttribute('data-text') || '';
+          for (var c = 0; c < txt.length; c++) {
+            var s = document.createElement('span');
+            s.className = 'intro-ch';
+            s.textContent = txt.charAt(c) === ' ' ? '\u00A0' : txt.charAt(c);
+            s.style.animationDelay = (0.35 + i * 0.05).toFixed(3) + 's';
+            nodes[n].appendChild(s);
+            i++;
+          }
+          i += 3;
+        }
+      } catch (e) {}
+      var timer = setTimeout(close, 3200);
+      function close() {
+        clearTimeout(timer);
+        if (el.classList) el.classList.add('intro-out');
+        setTimeout(function () { if (el.parentNode) el.parentNode.removeChild(el); }, 700);
+      }
+      el.addEventListener('click', close);
+    })();
+  </script>
+
+  <!-- offline QR libraries (no internet needed) -->
+  <script src="js/vendor/qrcode.min.js"></script>
+  <script src="js/vendor/jsQR.js"></script>
+
+  <!-- app -->
+  <script src="js/api.js"></script>
+  <script src="js/util.js"></script>
+  <script src="js/views/student.js"></script>
+  <script src="js/views/admin.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

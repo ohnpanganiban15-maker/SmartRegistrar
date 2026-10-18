@@ -1,0 +1,12 @@
+{
+  "appId": "ph.cdlshs.smartregistrar",
+  "appName": "SmartRegistrar",
+  "webDir": "public",
+  "backgroundColor": "#0F4C81",
+  "android": {
+    "allowMixedContent": true
+  },
+  "server": {
+    "androidScheme": "http"
+  }
+}

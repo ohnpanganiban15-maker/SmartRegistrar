@@ -1,0 +1,18 @@
+[Unit]
+Description=Smart Registrar (CDLSHS)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=registrar
+WorkingDirectory=/opt/smart-registrar
+EnvironmentFile=/opt/smart-registrar/.env
+ExecStart=/usr/bin/node server/index.js
+Restart=always
+RestartSec=3
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

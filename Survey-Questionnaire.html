@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CDLSHS Smart Registrar and Document Request — User Acceptance Survey</title>
+<style>
+  :root { --navy:#0F4C81; --ink:#1c2733; --line:#c9d4e0; }
+  * { box-sizing:border-box; }
+  body {
+    font-family: Georgia, 'Times New Roman', serif;
+    color:var(--ink); background:#eef2f6; margin:0; padding:28px 16px;
+    font-size:13.5px; line-height:1.5;
+  }
+  .sheet {
+    max-width:820px; margin:0 auto; background:#fff; padding:38px 44px;
+    border:1px solid var(--line); box-shadow:0 6px 24px rgba(15,76,129,.08);
+  }
+  header { text-align:center; border-bottom:3px double var(--navy); padding-bottom:14px; margin-bottom:16px; }
+  header img { width:86px; height:86px; border-radius:50%; object-fit:cover; border:2px solid var(--navy); }
+  .school { font-size:12.5px; letter-spacing:.14em; text-transform:uppercase; margin:8px 0 2px; font-weight:bold; }
+  h1 { font-size:19px; margin:6px 0 2px; color:var(--navy); letter-spacing:.03em; }
+  .sub { font-size:13px; font-style:italic; color:#456; }
+  .meta { display:flex; justify-content:space-between; font-size:12px; margin-top:8px; color:#456; }
+  h2 {
+    font-size:14.5px; background:var(--navy); color:#fff; padding:6px 12px;
+    margin:22px 0 0; letter-spacing:.06em; text-transform:uppercase;
+  }
+  .note { font-size:12.5px; background:#f3f7fb; border-left:4px solid var(--navy); padding:8px 12px; margin:12px 0; }
+  .profile { display:flex; gap:14px; flex-wrap:wrap; margin:14px 0 4px; font-size:13px; }
+  .profile div { flex:1; min-width:170px; border-bottom:1px solid var(--ink); padding-bottom:16px; }
+  table { width:100%; border-collapse:collapse; margin-top:8px; font-size:12.8px; }
+  th, td { border:1px solid var(--line); padding:7px 8px; text-align:center; }
+  th { background:#eaf1f8; color:var(--navy); font-size:11.5px; text-transform:uppercase; letter-spacing:.04em; }
+  th.stmt, td.stmt { text-align:left; width:56%; }
+  td.num { width:26px; color:#678; }
+  .scale { display:flex; gap:10px; flex-wrap:wrap; font-size:12.5px; margin:8px 0 2px; }
+  .scale b { color:var(--navy); }
+  .remarks { margin-top:16px; font-size:13px; }
+  .remarks .box { border:1px solid var(--line); min-height:74px; margin-top:6px; }
+  .sign { display:flex; justify-content:space-between; gap:30px; margin-top:34px; font-size:12.5px; }
+  .sign div { flex:1; text-align:center; border-top:1px solid var(--ink); padding-top:5px; }
+  .toolbar { max-width:820px; margin:0 auto 12px; text-align:right; }
+  .toolbar button {
+    background:var(--navy); color:#fff; border:0; border-radius:8px;
+    padding:9px 18px; font-size:14px; cursor:pointer;
+  }
+  footer { text-align:center; font-size:11px; color:#678; margin-top:18px; }
+  @media print {
+    body { background:#fff; padding:0; font-size:12.3px; }
+    .sheet { border:0; box-shadow:none; padding:0; max-width:none; }
+    .toolbar { display:none; }
+    h2 { -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+    header { -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+    th { -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+    .note { -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+  }
+  @page { size:A4; margin:14mm; }
+</style>
+</head>
+<body>
+
+<div class="toolbar"><button onclick="window.print()">🖨 Print / Save as PDF</button></div>
+
+<div class="sheet">
+  <header>
+    <img src="public/assets/logo.jpg" alt="CDLSHS logo">
+    <div class="school">Crejencia Drucila Lopez Senior High School</div>
+    <h1>USER ACCEPTANCE SURVEY QUESTIONNAIRE</h1>
+    <div class="sub">CDLSHS Smart Registrar and Document Request — Functionality · Design · Safety</div>
+    <div class="meta"><span>AY 2026–2027 · 1st Semester</span><span>Target respondents: Students &amp; Registrar</span></div>
+  </header>
+
+  <div class="note">
+    <b>Instructions:</b> Read each statement carefully. For every item, check (✓) the box that corresponds
+    to how much you agree with the statement. Answer honestly — your responses will be used to evaluate
+    and improve the Smart Registrar and Document Request System. This survey is confidential.
+  </div>
+
+  <div class="scale">
+    <b>Scale:</b>
+    <span>5 — Strongly Agree</span><span>4 — Agree</span><span>3 — Neutral</span>
+    <span>2 — Disagree</span><span>1 — Strongly Disagree</span>
+  </div>
+
+  <div class="profile">
+    <div>Name (optional):</div>
+    <div>Grade &amp; Strand:</div>
+    <div>Role: &#9744; Student &nbsp; &#9744; Registrar/Admin</div>
+  </div>
+
+  <!-- ================= PART I ================= -->
+  <h2>Part I — Functionality</h2>
+  <table>
+    <thead>
+      <tr>
+        <th class="num">#</th><th class="stmt">Statement</th>
+        <th>5</th><th>4</th><th>3</th><th>2</th><th>1</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr><td class="num">1.</td><td class="stmt">I can log in and access my account quickly and without errors.</td><td></td><td></td><td></td><td></td><td></td></tr>
+      <tr><td class="num">2.</td><td class="stmt">I can submit a document request easily, and it is recorded correctly by the system.</td><td></td><td></td><td></td><td></td><td></td></tr>
+      <tr><td class="num">3.</td><td class="stmt">The status of my request (Pending, Processing, Ready for Pickup, Completed) and the pickup date set by the registrar are accurate and always up to date.</td><td></td><td></td><td></td><td></td><td></td></tr>
+      <tr><td class="num">4.</td><td class="stmt">I receive notifications/alerts about the updates on my requests.</td><td></td><td></td><td></td><td></td><td></td></tr>
+      <tr><td class="num">5.</td><td class="stmt">I can change my own password easily, and the system confirms that it was updated successfully.</td><td></td><td></td><td></td><td></td><td></td></tr>
+    </tbody>
+  </table>
+
+  <!-- ================= PART II ================= -->
+  <h2>Part II — Design</h2>
+  <table>
+    <thead>
+      <tr>
+        <th class="num">#</th><th class="stmt">Statement</th>
+        <th>5</th><th>4</th><th>3</th><th>2</th><th>1</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr><td class="num">1.</td><td class="stmt">The layout and overall appearance of the system are clean, modern, and pleasing to the eye.</td><td></td><td></td><td></td><td></td><td></td></tr>
+      <tr><td class="num">2.</td><td class="stmt">Buttons, menus, and navigation are easy to find and understand.</td><td></td><td></td><td></td><td></td><td></td></tr>
+      <tr><td class="num">3.</td><td class="stmt">Text, fonts, and colors are readable and consistent throughout the system, in both light and dark mode.</td><td></td><td></td><td></td><td></td><td></td></tr>
+      <tr><td class="num">4.</td><td class="stmt">The system is easy to use on a mobile phone, and the screen adapts well to different devices (browser and installed app).</td><td></td><td></td><td></td><td></td><td></td></tr>
+      <tr><td class="num">5.</td><td class="stmt">The welcome animation, school logo, and visual theme make the system look professional and appropriate for CDLSHS.</td><td></td><td></td><td></td><td></td><td></td></tr>
+    </tbody>
+  </table>
+
+  <!-- ================= PART III ================= -->
+  <h2>Part III — Safety</h2>
+  <table>
+    <thead>
+      <tr>
+        <th class="num">#</th><th class="stmt">Statement</th>
+        <th>5</th><th>4</th><th>3</th><th>2</th><th>1</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr><td class="num">1.</td><td class="stmt">I feel that my personal information is kept secure inside the system.</td><td></td><td></td><td></td><td></td><td></td></tr>
+      <tr><td class="num">2.</td><td class="stmt">My account is protected — wrong passwords are rejected, and repeated failed logins temporarily lock the account.</td><td></td><td></td><td></td><td></td><td></td></tr>
+      <tr><td class="num">3.</td><td class="stmt">Only the registrar/admin can process requests, manage records, export data, and back up the database; students cannot access other people's data.</td><td></td><td></td><td></td><td></td><td></td></tr>
+      <tr><td class="num">4.</td><td class="stmt">The system automatically signs me out after a period of inactivity, and asks for confirmation before cancelling, rejecting, or deleting anything.</td><td></td><td></td><td></td><td></td><td></td></tr>
+      <tr><td class="num">5.</td><td class="stmt">The system handles errors safely (it shows clear warning messages) and does not lose my submitted data.</td><td></td><td></td><td></td><td></td><td></td></tr>
+    </tbody>
+  </table>
+
+  <div class="remarks">
+    <b>Additional comments / suggestions for improvement:</b>
+    <div class="box"></div>
+  </div>
+
+  <div class="sign">
+    <div>Respondent's Signature</div>
+    <div>Date Checked</div>
+    <div>Checked by the Researcher</div>
+  </div>
+
+  <footer>CDLSHS Smart Registrar and Document Request · Functionality · Design · Safety · 15 items</footer>
+</div>
+
+</body>
+</html>

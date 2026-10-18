@@ -1,0 +1,22 @@
+{
+  "name": "smart-registrar-cdlshs",
+  "version": "1.0.0",
+  "description": "Smart Registrar Application for Appointment and Document Requests at CDLSHS",
+  "main": "server/index.js",
+  "scripts": {
+    "start": "node server/index.js",
+    "seed": "node server/seed.js"
+  },
+  "dependencies": {
+    "@capacitor/android": "^8.5.2",
+    "@capacitor/cli": "^8.5.2",
+    "@capacitor/core": "^8.5.2",
+    "bcryptjs": "^2.4.3",
+    "express": "^4.21.2",
+    "jsonwebtoken": "^9.0.2",
+    "nodemailer": "^10.1.1"
+  },
+  "devDependencies": {
+    "jsdom": "^30.1.1"
+  }
+}

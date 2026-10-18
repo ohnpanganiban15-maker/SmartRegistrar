@@ -1,0 +1,33 @@
+services:
+  - type: web
+    name: smart-registrar
+    runtime: node
+    plan: free
+    region: singapore
+    buildCommand: npm install --omit=dev
+    startCommand: node server/index.js
+    healthCheckPath: /
+    envVars:
+      - key: NODE_VERSION
+        value: 24.16.0
+      - key: NODE_ENV
+        value: production
+      - key: JWT_SECRET
+        generateValue: true
+      - key: SEED_SAMPLE
+        value: "0"
+      - key: PORT
+        value: 10000
+      - key: HOST
+        value: 0.0.0.0
+      - key: DB_PATH
+        value: ./database/smart-registrar.db
+      # Para gumana ang OTP sa Gmail (optional pero RECOMMENDED):
+      - key: GMAIL_USER
+        sync: false
+      - key: GMAIL_APP_PASSWORD
+        sync: false
+      - key: OTP_TTL_MINUTES
+        value: "10"
+      - key: OTP_MAX_ATTEMPTS
+        value: "5"
