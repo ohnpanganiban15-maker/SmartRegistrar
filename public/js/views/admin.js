@@ -81,7 +81,7 @@ function viewAdminStudents() {
       oninput="filterStudentsSearch(this.value)">
     <select class="input" onchange="state.studentFilter.grade=this.value;render()">
       <option value="">All grades</option>
-      ${['7', '8', '9', '10', '11', '12'].map(g =>
+      ${['11', '12'].map(g =>
         `<option value="${g}" ${f.grade === g ? 'selected' : ''}>Grade ${g}</option>`).join('')}
     </select>
     <select class="input" onchange="state.studentFilter.status=this.value;render()">

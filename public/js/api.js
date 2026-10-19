@@ -50,17 +50,51 @@ const Api = {
     try { return JSON.parse(localStorage.getItem('sr_user') || 'null'); } catch (e) { return null; }
   },
 
+  isNative() {
+    return typeof window !== 'undefined' && window.Capacitor &&
+      typeof window.Capacitor.isNativePlatform === 'function' && window.Capacitor.isNativePlatform();
+  },
+
+  /* raw fetch with self-healing:
+     - wrong/stale saved address (old installs) → auto-switch to the official server
+     - server waking up / cold start → short wait + retry (GET only) */
+  async _raw(path, opts, attempt) {
+    attempt = attempt || 0;
+    let res;
+    try {
+      res = await fetch(this.base + path, opts);
+    } catch (e) {
+      if (this.isNative() && this.base && this.base !== this.defaultServer) {
+        this.base = this.defaultServer; /* stale address (e.g. old LAN IP) → official server */
+        return this._raw(path, opts, attempt + 1);
+      }
+      if ((opts.method || 'GET') === 'GET' && attempt < 1) {
+        await new Promise(r => setTimeout(r, 3000)); /* cold start — give it a moment */
+        return this._raw(path, opts, attempt + 1);
+      }
+      const err = new Error('Cannot reach the server. Check your internet connection and try again.');
+      err.offline = true;
+      throw err;
+    }
+    if ((res.status === 502 || res.status === 503) && attempt < 1) {
+      await new Promise(r => setTimeout(r, 3000)); /* server still waking up */
+      return this._raw(path, opts, attempt + 1);
+    }
+    return res;
+  },
+
   async call(method, path, body) {
     const headers = { 'Content-Type': 'application/json' };
     if (this.token) headers.Authorization = 'Bearer ' + this.token;
     let res;
     try {
-      res = await fetch(this.base + path, {
+      res = await this._raw(path, {
         method, headers,
         body: body === undefined ? undefined : JSON.stringify(body)
       });
     } catch (e) {
-      const err = new Error('Cannot reach the server. Check that it is running and the address is correct.');
+      if (e.offline) throw e;
+      const err = new Error('Cannot reach the server. Check your internet connection and try again.');
       err.offline = true;
       throw err;
     }
@@ -90,9 +124,10 @@ const Api = {
     if (this.token) headers.Authorization = 'Bearer ' + this.token;
     let res;
     try {
-      res = await fetch(this.base + path, { method: method || 'GET', headers });
+      res = await this._raw(path, { method: method || 'GET', headers });
     } catch (e) {
-      const err = new Error('Cannot reach the server. Check that it is running and the address is correct.');
+      if (e.offline) throw e;
+      const err = new Error('Cannot reach the server. Check your internet connection and try again.');
       err.offline = true;
       throw err;
     }
@@ -116,9 +151,15 @@ const Api = {
     return res;
   },
 
-  /* test the configured server address */
+  /* test the configured server address — retries once (server may be waking) */
   async ping() {
-    const res = await fetch(this.base + '/api/auth/me');
-    return res.ok || res.status === 401;
+    for (let i = 0; i < 2; i++) {
+      try {
+        const res = await fetch(this.base + '/api/auth/me');
+        if (res.ok || res.status === 401) return true;
+      } catch (e) {}
+      if (i === 0) await new Promise(r => setTimeout(r, 3000));
+    }
+    return false;
   }
 };

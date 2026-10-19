@@ -1060,7 +1060,7 @@ async function boot() {
         state.view = '__setup';
         document.getElementById('app').innerHTML = viewSetup();
         document.getElementById('setup-error').innerHTML =
-          '<div class="error-box">Cannot reach the server. Is it running?</div>';
+          '<div class="error-box">Cannot reach the server. Check your internet connection, then tap Connect to try again.</div>';
         return;
       }
     }
