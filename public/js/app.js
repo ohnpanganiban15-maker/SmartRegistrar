@@ -496,6 +496,8 @@ async function cancelAppt(id) {
 }
 
 /* ---------- document requests ---------- */
+let _reqDraft = null;
+
 function openRequestForm() {
   const types = state.docTypes && state.docTypes.length
     ? state.docTypes
@@ -503,6 +505,7 @@ function openRequestForm() {
        { name: 'Good Moral Certificate' }, { name: 'Diploma' }, { name: 'Form 137' },
        { name: 'Form 138' }, { name: 'SF9' }, { name: 'SF10' },
        { name: 'Certification' }, { name: 'Other Registrar Documents' }];
+  const p = _reqDraft || {};
   openModal(`
     <div class="modal-head">
       <div class="modal-title">New Document Request</div>
@@ -512,21 +515,23 @@ function openRequestForm() {
       <div id="rf-error"></div>
       <div class="field"><label>Document type</label>
         <select class="input" id="rf-type">
-          ${types.map(t => `<option>${esc(t.name)}</option>`).join('')}
+          ${types.map(t => `<option${p.docType === t.name ? ' selected' : ''}>${esc(t.name)}</option>`).join('')}
         </select></div>
       <div class="field"><label>Quantity</label>
-        <input class="input" id="rf-qty" type="number" min="1" max="50" value="1"></div>
+        <input class="input" id="rf-qty" type="number" min="1" max="50" value="${p.quantity || 1}"></div>
       <div class="field"><label>Purpose *</label>
-        <input class="input" id="rf-purpose" placeholder="e.g., College application" required></div>
+        <input class="input" id="rf-purpose" placeholder="e.g., College application" value="${esc(p.purpose || '')}" required></div>
       <div class="field"><label>Additional information</label>
-        <textarea class="input" id="rf-notes" placeholder="Anything the registrar should know…"></textarea></div>
+        <textarea class="input" id="rf-notes" placeholder="Anything the registrar should know…">${esc(p.notes || '')}</textarea></div>
     </div>
     <div class="modal-actions">
       <button class="btn btn-outline" onclick="closeModal()">Cancel</button>
       <button class="btn btn-primary" onclick="submitRequest()">Submit request</button>
     </div>`);
 }
-async function submitRequest() {
+
+/* step 1: validate the form, then show the confirmation summary */
+function submitRequest() {
   const body = {
     docType: document.getElementById('rf-type').value,
     quantity: parseInt(document.getElementById('rf-qty').value, 10) || 1,
@@ -537,13 +542,58 @@ async function submitRequest() {
     document.getElementById('rf-error').innerHTML = '<div class="error-box">Purpose is required.</div>';
     return;
   }
+  _reqDraft = body;
+  openModal(`
+    <div class="modal-head">
+      <div class="modal-title">Confirm request</div>
+      <button class="modal-x" onclick="closeModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div id="rc-error"></div>
+      <p class="muted">Submit this document request? The registrar will be notified and it will appear under <b>Pending</b>.</p>
+      <div class="kv"><span class="k">Document</span><span class="v">${esc(body.docType)}</span></div>
+      <div class="kv"><span class="k">Quantity</span><span class="v">${body.quantity}</span></div>
+      <div class="kv"><span class="k">Purpose</span><span class="v">${esc(body.purpose)}</span></div>
+      ${body.notes ? `<div class="kv"><span class="k">Notes</span><span class="v">${esc(body.notes)}</span></div>` : ''}
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="backToRequestForm()">← Back</button>
+      <button class="btn btn-primary" onclick="confirmSubmitRequest()">Yes, submit request</button>
+    </div>`);
+}
+
+/* back to the form with everything intact */
+function backToRequestForm() {
+  openRequestForm();
+}
+
+/* step 2: actually submit, then show the success confirmation */
+async function confirmSubmitRequest() {
+  const body = _reqDraft;
+  if (!body) { closeModal(); return; }
   try {
     const r = await Api.post('/api/requests', body);
-    closeModal();
+    _reqDraft = null;
     toast('Request ' + r.ref + ' submitted!');
+    openModal(`
+      <div class="modal-head">
+        <div class="modal-title">Request submitted</div>
+        <button class="modal-x" onclick="closeModal()">✕</button>
+      </div>
+      <div class="modal-body" style="text-align:center;">
+        <div class="qr-ref" style="font-size:26px;">${esc(r.ref)}</div>
+        <p class="muted small" style="margin-top:10px;">Your request for <b>${esc(r.doc_type)}</b> (x${r.quantity}) was sent to the registrar. Keep this reference number.</p>
+        <div style="margin-top:8px;">${stamp(r.status)}</div>
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-outline" onclick="closeModal()">Close</button>
+        <button class="btn btn-primary" onclick="closeModal();go('myRequests')">View my requests</button>
+      </div>`);
     if (state.view === 'myRequests') await go('myRequests');
     else await go('dashboard');
   } catch (err) {
+    /* show the error but keep everything typed */
+    openRequestForm();
     const box = document.getElementById('rf-error');
     if (box) box.innerHTML = '<div class="error-box">' + esc(err.message) + '</div>';
   }
