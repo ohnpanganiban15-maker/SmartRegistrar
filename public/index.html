@@ -19,11 +19,21 @@
 
   <!-- animated welcome intro (plays on every app open) -->
   <div id="intro-splash" class="intro-splash">
+    <div class="intro-aurora">
+      <span class="ab ab1"></span>
+      <span class="ab ab2"></span>
+      <span class="ab ab3"></span>
+    </div>
+    <div class="intro-grid"></div>
     <div class="intro-inner">
-      <img class="intro-logo" src="assets/logo.jpg" alt="">
+      <div class="intro-logo-wrap">
+        <span class="intro-ring"></span>
+        <img class="intro-logo" src="assets/logo.jpg" alt="">
+      </div>
       <div class="intro-welcome" data-text="WELCOME"></div>
       <div class="intro-name" data-text="CRECENCIAN"></div>
-      <div class="intro-sub">CDLSHS SMART REGISTRAR</div>
+      <div class="intro-sub"><span>CDLSHS SMART REGISTRAR</span></div>
+      <div class="intro-bar"><i></i></div>
     </div>
     <div class="intro-hint">tap anywhere to skip</div>
   </div>
@@ -41,14 +51,14 @@
             var s = document.createElement('span');
             s.className = 'intro-ch';
             s.textContent = txt.charAt(c) === ' ' ? '\u00A0' : txt.charAt(c);
-            s.style.animationDelay = (0.35 + i * 0.05).toFixed(3) + 's';
+            s.style.animationDelay = (0.3 + i * 0.045).toFixed(3) + 's';
             nodes[n].appendChild(s);
             i++;
           }
           i += 3;
         }
       } catch (e) {}
-      var timer = setTimeout(close, 3200);
+      var timer = setTimeout(close, 3000);
       function close() {
         clearTimeout(timer);
         if (el.classList) el.classList.add('intro-out');
