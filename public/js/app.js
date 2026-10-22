@@ -581,14 +581,16 @@ async function confirmSubmitRequest() {
         <button class="modal-x" onclick="closeModal()">✕</button>
       </div>
       <div class="modal-body" style="text-align:center;">
-        <div class="qr-ref" style="font-size:26px;">${esc(r.ref)}</div>
-        <p class="muted small" style="margin-top:10px;">Your request for <b>${esc(r.doc_type)}</b> (x${r.quantity}) was sent to the registrar. Keep this reference number.</p>
+        <div class="qr-box" id="qr-req-target"></div>
+        <div class="qr-ref" style="font-size:24px;">${esc(r.ref)}</div>
+        <p class="muted small" style="margin-top:8px;">Your request for <b>${esc(r.doc_type)}</b> (x${r.quantity}) was sent to the registrar. Show this QR at the counter — it has your name and what you requested.</p>
         <div style="margin-top:8px;">${stamp(r.status)}</div>
       </div>
       <div class="modal-actions">
         <button class="btn btn-outline" onclick="closeModal()">Close</button>
         <button class="btn btn-primary" onclick="closeModal();go('myRequests')">View my requests</button>
       </div>`);
+    renderQrInto('qr-req-target', r.ref);
     if (state.view === 'myRequests') await go('myRequests');
     else await go('dashboard');
   } catch (err) {
@@ -898,6 +900,8 @@ async function lookupCode(codeOverride) {
         </div>
         <div class="mt-8"><b>${esc(d.name)}</b></div>
         <div class="kv"><span class="k">Service / Doc</span><span class="v">${esc(d.service)}</span></div>
+        ${d.quantity ? `<div class="kv"><span class="k">Quantity</span><span class="v">${d.quantity}</span></div>` : ''}
+        ${d.purpose ? `<div class="kv"><span class="k">Purpose</span><span class="v">${esc(d.purpose)}</span></div>` : ''}
         <div class="kv"><span class="k">Date</span><span class="v">${fmtDate(d.date)}</span></div>
         ${d.time && d.time !== 'x' ? `<div class="kv"><span class="k">Time</span><span class="v">${fmtTime(d.time) || esc(d.time)}</span></div>` : ''}
         <div class="muted small mt-8">Sensitive student details are hidden in QR lookups.</div>

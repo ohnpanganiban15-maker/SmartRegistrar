@@ -125,7 +125,8 @@ router.get('/qr/lookup', requireAuth, (req, res) => {
     if (!r) return res.status(404).json({ error: 'No request found for ' + code });
     return res.json({
       type: 'document_request', ref: r.ref, name: r.student_name, service: r.doc_type,
-      date: r.pickup_date || r.created_at.slice(0, 10), time: 'x' + r.quantity, status: r.status
+      quantity: r.quantity, purpose: r.purpose || '',
+      date: r.pickup_date || r.created_at.slice(0, 10), time: '', status: r.status
     });
   }
   if (code.startsWith('STU-')) {

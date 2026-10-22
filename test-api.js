@@ -200,7 +200,9 @@ async function call(method, path, token, body) {
   r = await call('GET', '/api/qr/lookup?code=' + apptRef, admin);
   assert(r.status === 200 && r.data.type === 'appointment', 'QR lookup appointment');
   r = await call('GET', '/api/qr/lookup?code=' + reqRef, admin);
-  assert(r.status === 200 && r.data.type === 'document_request', 'QR lookup request');
+  assert(r.status === 200 && r.data.type === 'document_request' &&
+    r.data.quantity === 2 && r.data.purpose === 'Enrollment' && r.data.name,
+    'QR lookup request (requester, qty, purpose)');
   r = await call('GET', '/api/qr/lookup?code=STU-' + stuNum, admin);
   assert(r.status === 200 && r.data.type === 'student' && !('contact' in r.data), 'QR student lookup hides sensitive fields');
   r = await call('GET', '/api/qr/lookup?code=BLAH', admin);
