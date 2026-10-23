@@ -1066,6 +1066,18 @@ html[data-theme="dark"] .topbar-nav a.active { color:#fff; }
 .brand-logo { border-radius:14px; }
 .admin-user { border-radius:999px; background:var(--glass-panel); }
 
+/* ---------- show / hide password ---------- */
+.pass-wrap { position:relative; }
+.pass-wrap .input { padding-right:46px; }
+.pass-eye {
+  position:absolute; right:7px; top:50%; transform:translateY(-50%);
+  width:34px; height:34px; border-radius:11px; border:none;
+  background:transparent; cursor:pointer; font-size:17px; line-height:1;
+  display:flex; align-items:center; justify-content:center;
+  transition:background .16s;
+}
+.pass-eye:hover { background:var(--surface-3); }
+
 /* ---------- request chat (messenger popup) ---------- */
 .chat-head {
   position:fixed; right:18px; bottom:94px; z-index:90;

@@ -22,7 +22,11 @@ function viewLogin() {
         </div>
         <div class="field">
           <label for="li-pass">Password</label>
-          <input class="input" id="li-pass" type="password" autocomplete="current-password" placeholder="••••••••" required>
+          <div class="pass-wrap">
+            <input class="input" id="li-pass" type="password" autocomplete="current-password" placeholder="••••••••" required>
+            <button type="button" class="pass-eye" onclick="togglePass('li-pass', this)"
+              title="Show password" aria-label="Show password">👁</button>
+          </div>
         </div>
         <button class="btn btn-primary btn-block" type="submit">Sign in</button>
       </form>

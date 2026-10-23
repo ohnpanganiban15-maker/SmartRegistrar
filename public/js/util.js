@@ -151,3 +151,17 @@ function barChart(rows, colorVar) {
       '<div class="bar-value">' + (Number(r.value) || 0) + '</div>' +
     '</div>').join('') + '</div>';
 }
+
+/* show / hide password toggle */
+function togglePass(inputId, btn) {
+  const el = document.getElementById(inputId);
+  if (!el) return;
+  const show = el.type === 'password';
+  el.type = show ? 'text' : 'password';
+  if (btn) {
+    btn.textContent = show ? '??' : '??';
+    btn.title = show ? 'Hide password' : 'Show password';
+    btn.setAttribute('aria-label', btn.title);
+  }
+  el.focus();
+}

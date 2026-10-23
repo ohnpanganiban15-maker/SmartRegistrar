@@ -100,6 +100,16 @@ const evalA = expr => w.eval(expr);
   assert(await reg('Alpha', 'Cabrera', em1, num1) === 201, 'fixture student A registers (OTP verified)');
   assert(await reg('Bravo', 'Testos', em2, num2) === 201, 'fixture student B registers (OTP verified)');
 
+  /* --- show / hide password toggle --- */
+  const passEl = w.document.getElementById('li-pass');
+  const eyeBtn = w.document.querySelector('.pass-eye');
+  assert(passEl && passEl.type === 'password', 'login password hidden by default');
+  assert(!!eyeBtn, 'show-password eye button present');
+  w.eval(`togglePass('li-pass', document.querySelector('.pass-eye'))`);
+  assert(w.document.getElementById('li-pass').type === 'text', 'eye toggle reveals password');
+  w.eval(`togglePass('li-pass', document.querySelector('.pass-eye'))`);
+  assert(w.document.getElementById('li-pass').type === 'password', 'eye toggle hides password again');
+
   /* --- student login --- */
   w.document.getElementById('li-email').value = em1;
   w.document.getElementById('li-pass').value = 'fix12345';
