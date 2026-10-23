@@ -158,6 +158,7 @@ function render() {
   }
   paintUnread();
   postRender();
+  if (typeof Chat !== 'undefined') Chat.paintBadge();
 }
 function safeView(fn) {
   try { return fn(); } catch (e) { console.error(e); return errorBox('Display error: ' + e.message); }
@@ -449,6 +450,7 @@ function logout() {
   state.confirmed = null;
   state.view = 'login';
   state.error = '';
+  if (typeof Chat !== 'undefined') Chat.reset();
   render();
 }
 

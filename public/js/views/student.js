@@ -343,6 +343,7 @@ function viewMyRequests() {
       <div class="muted small">Purpose: ${esc(r.purpose || '—')}${r.pickup_date ? ' · Pickup: ' + fmtDateShort(r.pickup_date) : ''}</div>
       ${r.notes ? `<div class="small mt-8">Notes: ${esc(r.notes)}</div>` : ''}
       <div class="flex mt-14">
+        <button class="btn btn-sm btn-primary" onclick="Chat.openThread(${r.id})">💬 Chat</button>
         <button class="btn btn-sm btn-outline" onclick="showQr('${esc(r.ref)}')">Show QR</button>
         ${['Pending', 'Processing'].includes(r.status) ? `
           <button class="btn btn-sm btn-danger" onclick="cancelRequest(${r.id})">Cancel</button>` : ''}

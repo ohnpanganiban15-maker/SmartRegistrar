@@ -255,6 +255,7 @@ function viewAdminRequests() {
         <td data-label="Status">${stamp(r.status)}</td>
         <td class="cell-actions" data-label="">
           <button class="btn btn-sm btn-ghost" onclick="showQr('${esc(r.ref)}')">QR</button>
+          <button class="btn btn-sm btn-outline" onclick="Chat.openThread(${r.id})">💬 Chat</button>
           ${statuses.filter(st => st !== r.status).map(st => {
             const cls = st === 'Completed' || st === 'Ready for Pickup' ? 'btn-success' :
               (st === 'Rejected' || st === 'Cancelled' ? 'btn-danger' : 'btn-outline');

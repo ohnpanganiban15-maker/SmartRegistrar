@@ -121,6 +121,18 @@ CREATE TABLE IF NOT EXISTS announcements (
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
+CREATE TABLE IF NOT EXISTS request_messages (
+  id           INTEGER PRIMARY KEY AUTOINCREMENT,
+  request_id   INTEGER NOT NULL REFERENCES document_requests(id) ON DELETE CASCADE,
+  sender_role  TEXT NOT NULL CHECK(sender_role IN ('student','admin')),
+  sender_id    INTEGER NOT NULL,
+  sender_name  TEXT NOT NULL DEFAULT '',
+  body         TEXT NOT NULL,
+  read_student INTEGER NOT NULL DEFAULT 0,
+  read_admin   INTEGER NOT NULL DEFAULT 0,
+  created_at   TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
 CREATE TABLE IF NOT EXISTS activity_logs (
   id         INTEGER PRIMARY KEY AUTOINCREMENT,
   user_id    INTEGER,
@@ -145,6 +157,7 @@ CREATE INDEX IF NOT EXISTS idx_appt_slot     ON appointments(slot_id);
 CREATE INDEX IF NOT EXISTS idx_appt_student  ON appointments(student_id);
 CREATE INDEX IF NOT EXISTS idx_req_student   ON document_requests(student_id);
 CREATE INDEX IF NOT EXISTS idx_notif_user    ON notifications(user_id);
+CREATE INDEX IF NOT EXISTS idx_rmsg_request  ON request_messages(request_id);
 CREATE INDEX IF NOT EXISTS idx_slot_date     ON appointment_slots(date);
 `;
 

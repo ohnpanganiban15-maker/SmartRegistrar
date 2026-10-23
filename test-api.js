@@ -187,6 +187,53 @@ async function call(method, path, token, body) {
   r = await call('GET', '/api/notifications', student);
   assert(r.data.some(n => n.title.includes('Replied')), 'reply notification');
 
+  /* --- request chat (messenger per request) --- */
+  r = await call('POST', '/api/messages/' + reqId, student, { text: 'Kailan po ma-release?' });
+  assert(r.status === 201 && r.data.sender_role === 'student', 'student sends message on request');
+  const rqMsgId = r.data.id;
+  r = await call('GET', '/api/messages/' + reqId, student);
+  assert(r.status === 200 && r.data.request.ref === reqRef &&
+    r.data.messages.some(m => m.id === rqMsgId), 'student reads thread history + meta');
+  r = await call('GET', '/api/messages/unread-count', admin);
+  assert(r.status === 200 && r.data.count >= 1, 'admin unread chat count (' + r.data.count + ')');
+  r = await call('POST', '/api/messages/' + reqId, admin, { text: 'Processing na po, konting hintay lang.' });
+  assert(r.status === 201 && r.data.sender_role === 'admin', 'admin replies in thread');
+  r = await call('GET', '/api/notifications', student);
+  assert(r.data.some(n => n.title.includes('Message from the Registrar')), 'student notified of admin chat message');
+  r = await call('GET', '/api/messages/unread-count', student);
+  assert(r.status === 200 && r.data.count >= 1 && r.data.latest_request_id === reqId,
+    'student unread count + latest thread for popup');
+  r = await call('POST', '/api/messages/' + reqId + '/read', student);
+  assert(r.status === 200, 'student marks thread read');
+  r = await call('GET', '/api/messages/unread-count', student);
+  assert(r.data.count === 0, 'student unread cleared after read');
+  r = await call('POST', '/api/messages/' + reqId + '/read', admin);
+  r = await call('GET', '/api/messages/unread-count', admin);
+  assert(r.data.count === 0, 'admin unread cleared after read');
+  r = await call('POST', '/api/messages/' + reqId, student, { text: '   ' });
+  assert(r.status === 400, 'empty chat message rejected');
+  r = await call('GET', '/api/messages/999999', student);
+  assert(r.status === 404, 'unknown thread → 404');
+  const otherEmail = 'other.chat.' + uniq + '@cdlshs.edu.ph';
+  r = await call('POST', '/api/auth/register', null, {
+    firstName: 'Other', lastName: 'Student', email: otherEmail,
+    password: 'other1234', studentNumber: 'S-2026-O' + uniq.toUpperCase().slice(-6),
+    gradeLevel: '11', strand: 'STEM'
+  });
+  assert(r.status === 201 && r.data.devOtp, 'chat-observer student registered');
+  r = await call('POST', '/api/auth/register/verify-otp', null, { email: otherEmail, otp: r.data.devOtp });
+  assert(r.status === 201, 'chat-observer OTP verified');
+  r = await call('POST', '/api/auth/login', null, { email: otherEmail, password: 'other1234' });
+  const observerTok = r.data.token;
+  r = await call('GET', '/api/messages/' + reqId, observerTok);
+  assert(r.status === 403, 'other student blocked from someone else\'s thread');
+  r = await call('POST', '/api/messages/' + reqId, observerTok, { text: 'hello po' });
+  assert(r.status === 403, 'other student cannot post into foreign thread');
+  r = await call('POST', '/api/messages/' + reqId, student, { text: 'Thanks po!' });
+  assert(r.status === 201, 'history persists for later messages (kahit matagal na)');
+  r = await call('GET', '/api/messages/' + reqId, admin);
+  assert(r.data.messages.length >= 3, 'thread history keeps all messages (' + r.data.messages.length + ')');
+
   /* --- announcements --- */
   r = await call('POST', '/api/announcements', admin, { title: 'Test Notice', body: 'Body' });
   assert(r.status === 201, 'admin posts announcement');

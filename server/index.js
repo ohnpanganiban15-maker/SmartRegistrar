@@ -37,6 +37,7 @@ app.use('/api/students', require('./routes/students'));
 app.use('/api/slots', require('./routes/slots'));
 app.use('/api/appointments', require('./routes/appointments'));
 app.use('/api/requests', require('./routes/requests'));
+app.use('/api/messages', require('./routes/messages'));
 app.use('/api/notifications', require('./routes/notifications'));
 app.use('/api/chat', require('./routes/chat'));
 app.use('/api/announcements', require('./routes/announcements'));

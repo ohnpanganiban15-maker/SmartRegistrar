@@ -42,7 +42,7 @@ function loadScript(content) {
   s.textContent = content;
   w.document.body.appendChild(s);
 }
-const scripts = ['js/api.js', 'js/util.js', 'js/views/student.js', 'js/views/admin.js'];
+const scripts = ['js/api.js', 'js/util.js', 'js/chat.js', 'js/views/student.js', 'js/views/admin.js'];
 for (const s of scripts) loadScript(fs.readFileSync(path.join(pub, s), 'utf8'));
 
 /* QRCode stub (real lib needs canvas which jsdom lacks) */
@@ -59,6 +59,19 @@ const evalA = expr => w.eval(expr);
 (async () => {
   /* start from a clean, example-free database */
   purge();
+  /* guarantee one announcement so the dashboard panel check is stable
+     (default seed does not create announcements) */
+  {
+    const { DatabaseSync } = require('node:sqlite');
+    const dbFile = path.isAbsolute(process.env.DB_PATH || '')
+      ? process.env.DB_PATH
+      : path.join(__dirname, process.env.DB_PATH || 'database/smart-registrar.db');
+    const db = new DatabaseSync(dbFile);
+    db.exec("DELETE FROM announcements WHERE title='Dashboard Panel Fixture'");
+    db.prepare("INSERT INTO announcements (title, body) VALUES (?,?)")
+      .run('Dashboard Panel Fixture', 'Fixture announcement for the dashboard panel test.');
+    db.close();
+  }
   await sleep(400); /* let boot() finish */
 
   /* --- boot → login screen --- */
@@ -100,6 +113,20 @@ const evalA = expr => w.eval(expr);
   assert(w.document.querySelector('.brand-sub') &&
     w.document.querySelector('.brand-sub').textContent.includes('Appointments'),
     'brand subtitle includes appointments');
+
+  /* --- request chat (messenger popup) --- */
+  assert(typeof w.eval('Chat.openThread') === 'function' && typeof w.eval('Chat.poll') === 'function',
+    'chat component loaded (openThread + poll)');
+  w.eval('Chat.ensure()');
+  assert(w.document.getElementById('chat-win') !== null &&
+    w.document.getElementById('chat-head') !== null,
+    'chat popup window + chat head in DOM');
+  assert(String(w.eval('viewMyRequests')).includes('Chat.openThread'),
+    'student My Requests has Chat button');
+  assert(String(w.eval('viewAdminRequests')).includes('Chat.openThread'),
+    'admin Requests table has Chat button');
+  w.eval('Chat.close()');
+  assert(w.document.getElementById('chat-win').hidden === true, 'chat popup closes');
 
   /* --- cycle every student view --- */
   const studentViews = ['availability', 'myRequests', 'myAppointments', 'notifications',
