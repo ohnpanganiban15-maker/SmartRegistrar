@@ -63,6 +63,9 @@ app.use((err, req, res, next) => {
 });
 
 /* ---- start ---- */
+/* restore a cloud snapshot FIRST if the local DB is empty (Render redeploys
+   wipe the ephemeral disk). Runs in the background — never blocks startup. */
+try { require('./persistence').init(); } catch (e) { console.error('[persistence]', e.message); }
 seed(); /* sample data only created when the DB is empty */
 
 app.listen(config.PORT, config.HOST, () => {
