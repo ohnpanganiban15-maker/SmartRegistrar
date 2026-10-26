@@ -37,3 +37,4 @@ services:
         value: "10"
       - key: OTP_MAX_ATTEMPTS
         value: "5"
+      # persistence verified: auto restore on boot
