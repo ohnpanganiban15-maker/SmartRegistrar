@@ -181,19 +181,35 @@ function viewDashboard() {
   const anns = (state.anns || []).slice(0, 2);
   const hour = new Date().getHours();
   const greet = hour < 12 ? 'Good morning' : (hour < 18 ? 'Good afternoon' : 'Good evening');
+  const st = me.student || {};
+  const fullName = st.first_name ? (st.first_name + ' ' + (st.last_name || '')) : (me.name || 'Student');
 
   return `
   <div class="page-head">
-    <div><h2>${greet}, ${esc((me.student && me.student.first_name) || me.name || 'Student')}!</h2>
+    <div><h2>${greet}, ${esc(st.first_name || me.name || 'Student')}!</h2>
       <div class="sub">Here's what's happening in your account today.</div></div>
     ${themeBtnHTML()}
   </div>
 
+  <div class="panel id-card">
+    <div class="id-left">
+      <div class="avatar lg">${esc(initials(fullName))}</div>
+      <div>
+        <div class="id-name">${esc(fullName)}</div>
+        <div class="id-meta">Grade ${esc(st.grade_level || '—')}${st.strand ? ' · ' + esc(st.strand) : ''}</div>
+      </div>
+    </div>
+    <div class="id-right">
+      <div class="id-lrn"><span>LRN</span><b class="mono">${esc(st.student_number || '—')}</b></div>
+      <span class="stamp st-approved">Enrolled</span>
+    </div>
+  </div>
+
   <div class="stat-grid">
-    <div class="stat-card"><div class="n">${s.pendingRequests || 0}</div><div class="l">Pending Requests</div></div>
-    <div class="stat-card gold"><div class="n">${s.processingRequests || 0}</div><div class="l">Processing</div></div>
-    <div class="stat-card green"><div class="n">${s.readyRequests || 0}</div><div class="l">Ready for Pickup</div></div>
-    <div class="stat-card"><div class="n">${s.completedRequests || 0}</div><div class="l">Completed Requests</div></div>
+    <div class="stat-card"><div class="sic">🕓</div><div class="n">${s.pendingRequests || 0}</div><div class="l">Pending Requests</div></div>
+    <div class="stat-card gold"><div class="sic">⚙️</div><div class="n">${s.processingRequests || 0}</div><div class="l">Processing</div></div>
+    <div class="stat-card green"><div class="sic">✅</div><div class="n">${s.readyRequests || 0}</div><div class="l">Ready for Pickup</div></div>
+    <div class="stat-card"><div class="sic">📄</div><div class="n">${s.completedRequests || 0}</div><div class="l">Completed Requests</div></div>
   </div>
 
   ${nextSlot ? `

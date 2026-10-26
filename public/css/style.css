@@ -403,6 +403,32 @@ html[data-theme="dark"] .topbar-nav a.active { color:var(--primary-deep); }
 .stat-card.green .n { background:linear-gradient(135deg,#5FBE87,#2E7D4F); -webkit-background-clip:text; background-clip:text; }
 .stat-card.red .n { background:linear-gradient(135deg,#E07B68,#BE4634); -webkit-background-clip:text; background-clip:text; }
 .stat-card .l { font-size:11.5px; color:var(--muted); font-weight:800; position:relative; z-index:1; letter-spacing:.06em; text-transform:uppercase; margin-top:4px; }
+.stat-card .sic {
+  width:34px; height:34px; border-radius:11px; position:relative; z-index:1;
+  display:flex; align-items:center; justify-content:center; font-size:17px;
+  background:var(--primary-pale); margin-bottom:12px;
+}
+.stat-card.gold .sic { background:var(--accent-pale); }
+.stat-card.green .sic { background:var(--success-pale); }
+.stat-card.red .sic { background:var(--danger-pale); }
+
+/* student identity strip on the dashboard */
+.id-card {
+  display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap;
+  padding:18px 20px; margin-bottom:20px; overflow:hidden; position:relative;
+}
+.id-card::after {
+  content:''; position:absolute; right:-40px; top:-60px; width:200px; height:200px;
+  border-radius:50%; background:var(--primary-pale); opacity:.5; filter:blur(26px); pointer-events:none;
+}
+.id-left { display:flex; align-items:center; gap:14px; position:relative; z-index:1; }
+.id-name { font-size:17.5px; font-weight:850; letter-spacing:-.02em; }
+.id-meta { font-size:13px; color:var(--muted); font-weight:600; margin-top:2px; }
+.id-right { display:flex; align-items:center; gap:14px; position:relative; z-index:1; }
+.id-lrn { text-align:right; }
+.id-lrn span { display:block; font-size:10.5px; color:var(--muted); font-weight:800; letter-spacing:.1em; text-transform:uppercase; }
+.id-lrn b { font-size:15px; letter-spacing:.02em; }
+.avatar.lg { width:52px; height:52px; font-size:19px; border-radius:16px; }
 
 .panel {
   background:var(--surface); border:1px solid var(--border); border-radius:var(--radius);
@@ -1079,6 +1105,10 @@ html[data-theme="dark"] .topbar-nav a.active { color:#fff; }
 .pass-eye:hover { background:var(--surface-3); }
 
 /* ---------- request chat (messenger popup) ---------- */
+/* the [hidden] attribute must win over any display rule below,
+   otherwise .chat-win/.chat-badge stay visible when toggled off */
+[hidden] { display:none !important; }
+
 .chat-head {
   position:fixed; right:18px; bottom:94px; z-index:90;
   width:56px; height:56px; border-radius:50%;

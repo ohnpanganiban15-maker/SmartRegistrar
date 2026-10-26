@@ -120,6 +120,9 @@ const evalA = expr => w.eval(expr);
   assert($app().includes('Announcements'), 'student dashboard: announcements panel kept');
   assert($app().includes('Next Pickup Schedule') || $app().includes('No pickup schedule'),
     'student dashboard: pickup schedule shown');
+  assert($app().includes('id-card') && $app().includes('LRN'),
+    'student dashboard: identity card with LRN shown');
+  assert($app().includes('Grade'), 'student dashboard: grade level shown');
   assert(w.document.querySelector('.brand-sub') &&
     w.document.querySelector('.brand-sub').textContent.includes('Appointments'),
     'brand subtitle includes appointments');
@@ -137,6 +140,11 @@ const evalA = expr => w.eval(expr);
     'admin Requests table has Chat button');
   w.eval('Chat.close()');
   assert(w.document.getElementById('chat-win').hidden === true, 'chat popup closes');
+  /* the real visibility fix is CSS: [hidden]{display:none!important} must beat
+     .chat-win/.chat-badge display:flex — asserted via the style sheet below */
+  assert(fs.readFileSync(path.join(pub, 'css/style.css'), 'utf8')
+    .includes('[hidden] { display:none !important; }'),
+    'chat CSS lets [hidden] override display:flex (window + badge actually hide)');
 
   /* --- cycle every student view --- */
   const studentViews = ['availability', 'myRequests', 'myAppointments', 'notifications',
@@ -180,6 +188,8 @@ const evalA = expr => w.eval(expr);
   await w.doLogin({ preventDefault: () => {} });
   await sleep(250);
   assert($app().includes('Registrar Dashboard'), 'admin dashboard renders after login');
+  assert(/\d{4}-\d{2}/.test($app()) && $app().includes('Semester'),
+    'admin dashboard: school year + semester context shown');
 
   /* --- cycle every admin view --- */
   const adminViews = ['adminStudents', 'adminAppointments', 'adminRequests', 'adminAvailability',

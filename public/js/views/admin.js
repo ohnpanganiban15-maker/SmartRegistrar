@@ -12,16 +12,18 @@ function viewAdminDashboard() {
 
   return `
   <div class="page-head">
-    <div><h2>Registrar Dashboard</h2><div class="sub">Overview of requests, students and pickup schedule</div></div>
+    <div><h2>Registrar Dashboard</h2>
+      <div class="sub">${schoolYear()} · ${currentSem()} · Overview of requests, students and pickup schedule</div></div>
     ${themeBtnHTML()}
   </div>
 
   <div class="stat-grid">
-    <div class="stat-card"><div class="n">${s.totalStudents || 0}</div><div class="l">Total Students</div></div>
-    <div class="stat-card gold"><div class="n">${s.pendingRequests || 0}</div><div class="l">Pending Requests</div></div>
-    <div class="stat-card"><div class="n">${s.processingRequests || 0}</div><div class="l">Processing</div></div>
-    <div class="stat-card green"><div class="n">${s.completedRequests || 0}</div><div class="l">Completed Requests</div></div>
-    <div class="stat-card red"><div class="n">${s.cancelledRequests || 0}</div><div class="l">Cancelled / Rejected</div></div>
+    <div class="stat-card"><div class="sic">👥</div><div class="n">${s.totalStudents || 0}</div><div class="l">Total Students</div></div>
+    <div class="stat-card gold"><div class="sic">🕓</div><div class="n">${s.pendingRequests || 0}</div><div class="l">Pending Requests</div></div>
+    <div class="stat-card"><div class="sic">⚙️</div><div class="n">${s.processingRequests || 0}</div><div class="l">Processing</div></div>
+    <div class="stat-card green"><div class="sic">📦</div><div class="n">${s.readyRequests || 0}</div><div class="l">Ready for Pickup</div></div>
+    <div class="stat-card green"><div class="sic">✅</div><div class="n">${s.completedRequests || 0}</div><div class="l">Completed</div></div>
+    <div class="stat-card red"><div class="sic">✖️</div><div class="n">${s.cancelledRequests || 0}</div><div class="l">Cancelled / Rejected</div></div>
   </div>
 
   <div class="grid-2">

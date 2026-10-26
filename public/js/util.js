@@ -165,3 +165,16 @@ function togglePass(inputId, btn) {
   }
   el.focus();
 }
+
+/* Philippine school year (starts June) + current semester */
+function schoolYear() {
+  const d = new Date();
+  const start = d.getMonth() + 1 >= 6 ? d.getFullYear() : d.getFullYear() - 1;
+  return start + '-' + String((start + 1) % 100).padStart(2, '0');
+}
+function currentSem() {
+  const m = new Date().getMonth() + 1;
+  if (m >= 8 && m <= 12) return 'First Semester';
+  if (m >= 1 && m <= 5) return 'Second Semester';
+  return 'Incoming Semester';
+}
