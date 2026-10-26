@@ -84,6 +84,14 @@ const assert = (c, msg) => { if (c) { pass++; console.log('PASS:', msg); } else 
   assert(!!q.get("SELECT id FROM users WHERE email='after.restore@cdlshs.edu.ph'"),
     're-restore keeps latest data');
 
+  /* --- safety guard: an empty/garbage snapshot must NOT wipe local data --- */
+  const usersBefore = persistence.snapshotJSON().tables.users.length;
+  const appliedEmpty = persistence.restoreFromJSON({ v: 1, created_at: 'x', tables: { users: [], students: [] } });
+  assert(appliedEmpty === false, 'empty snapshot rejected (restore returns false)');
+  const usersAfter = persistence.snapshotJSON().tables.users.length;
+  assert(usersAfter === usersBefore && usersAfter > 0,
+    'local users NOT wiped by empty snapshot (' + usersAfter + ' remain)');
+
   try { fs.unlinkSync(tmp); } catch (e) {}
   console.log('\nResults: ' + pass + ' passed, ' + fail + ' failed');
   process.exit(fail ? 1 : 0);

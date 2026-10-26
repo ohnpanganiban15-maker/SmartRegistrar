@@ -22,6 +22,12 @@ services:
         value: 0.0.0.0
       - key: DB_PATH
         value: ./database/smart-registrar.db
+      # Persistence — automatic DB snapshot backup/restore (Supabase).
+      # Lets records survive Render redeploys (ephemeral disk).
+      - key: SUPABASE_URL
+        value: https://rvluxkqfxmjthdbzzpba.supabase.co
+      - key: SUPABASE_ANON_KEY
+        value: sb_publishable_JC1o45aNwdLF6PUr_U-EHQ_ZSFy-FnQ
       # Para gumana ang OTP sa Gmail (optional pero RECOMMENDED):
       - key: GMAIL_USER
         sync: false

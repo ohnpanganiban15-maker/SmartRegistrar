@@ -49,7 +49,10 @@ function resetSequences() {
 }
 
 function restoreFromJSON(snap) {
+  /* safety: never wipe local data for a snapshot that carries no users.
+     (An empty/garbage snapshot would DELETE everything and restore nothing.) */
   if (!snap || !snap.tables) return false;
+  if (!Array.isArray(snap.tables.users) || snap.tables.users.length === 0) return false;
   db.exec('PRAGMA foreign_keys=OFF');
   try {
     for (const t of TABLES) db.exec('DELETE FROM ' + t);
@@ -134,9 +137,11 @@ async function restoreIfEmpty() {
   try {
     const snap = await storageLoad();
     if (snap && snap.tables) {
-      restoreFromJSON(snap);
-      console.log('[persistence] restored snapshot (' + (snap.created_at || '?') + ')');
-      return true;
+      const ok = restoreFromJSON(snap);
+      if (ok) {
+        console.log('[persistence] restored snapshot (' + (snap.created_at || '?') + ')');
+        return true;
+      }
     }
   } catch (e) {
     console.error('[persistence] restore failed:', e.message);
