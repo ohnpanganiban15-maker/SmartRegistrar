@@ -137,7 +137,7 @@ function render() {
   const app = document.getElementById('app');
   if (state.view === '__setup') { app.innerHTML = viewSetup(); return; }
   if (state.view === 'login') { app.innerHTML = viewLogin(); return; }
-  if (state.view === 'register') { app.innerHTML = viewRegister(); return; }
+  if (state.view === 'register') { app.innerHTML = viewRegister(); restoreFormValues(); return; }
   if (state.view === 'otp') { app.innerHTML = viewOtp(); return; }
 
   const viewFn = VIEWS[state.view] || VIEWS.dashboard;
@@ -171,6 +171,32 @@ function postRender() {
   if (state.view === 'myQr' && state.me) {
     const num = (state.me.student && state.me.student.student_number) || state.me.id;
     renderQrInto('qr-stu', 'STU-' + num);
+  }
+  restoreFormValues();
+}
+
+/* re-fill auth form fields after an error re-render (so nothing is lost) */
+function _setFormVal(id, v) { const el = document.getElementById(id); if (el && v != null) el.value = v; }
+function restoreFormValues() {
+  const f = state.form || {};
+  if (state.view === 'register' && f.rg) {
+    const g = f.rg;
+    _setFormVal('rg-num', g.studentNumber);
+    _setFormVal('rg-email', g.email);
+    _setFormVal('rg-first', g.firstName);
+    _setFormVal('rg-last', g.lastName);
+    _setFormVal('rg-middle', g.middleName);
+    _setFormVal('rg-contact', g.contact);
+    _setFormVal('rg-pass', g.password);
+    _setFormVal('rg-grade', g.gradeLevel);
+    _setFormVal('rg-strand', g.strandSel);
+    if (typeof toggleTvSpec === 'function') toggleTvSpec();
+    if (g.strandSel === 'TVL/TechPro') _setFormVal('rg-spec', g.spec);
+  }
+  if (state.view === 'changePassword' && f.cp) {
+    _setFormVal('cp-current', f.cp.currentPassword);
+    _setFormVal('cp-new', f.cp.newPassword);
+    _setFormVal('cp-confirm', f.cp.confirm);
   }
 }
 
@@ -364,15 +390,25 @@ async function doRegister(e) {
     password: document.getElementById('rg-pass').value
   };
   const weak = passwordIssue(body.password);
-  if (weak) { state.error = weak; return render(); }
+  /* stash everything typed so an error re-render doesn't wipe the form */
+  const stash = {
+    studentNumber: body.studentNumber, email: body.email, firstName: body.firstName,
+    lastName: body.lastName, middleName: body.middleName, gradeLevel: body.gradeLevel,
+    strandSel: strandSel, spec: (specEl ? specEl.value : ''), contact: body.contact,
+    password: body.password
+  };
+  const keepRg = () => { state.form = state.form || {}; state.form.rg = stash; };
+  if (weak) { keepRg(); state.error = weak; return render(); }
   try {
     const data = await Api.post('/api/auth/register', body);
+    if (state.form) delete state.form.rg;
     state.otpPurpose = 'register';
     state.otpEmail = body.email;
     state.devOtp = (data && data.devOtp) || '';
     state.error = '';
     go('otp');
   } catch (err) {
+    keepRg();
     state.error = err.message;
     render();
   }
@@ -400,17 +436,22 @@ async function doChangePasswordRequestOtp(e) {
   const currentPassword = document.getElementById('cp-current').value;
   const newPassword = document.getElementById('cp-new').value;
   const confirm = document.getElementById('cp-confirm').value;
-  if (newPassword !== confirm) { state.error = 'Passwords do not match'; return render(); }
+  /* keep whatever the user typed so an error doesn't clear the fields */
+  const stash = { currentPassword, newPassword, confirm };
+  const keepCp = () => { state.form = state.form || {}; state.form.cp = stash; };
+  if (newPassword !== confirm) { keepCp(); state.error = 'Passwords do not match'; return render(); }
   const weak = passwordIssue(newPassword);
-  if (weak) { state.error = weak; return render(); }
+  if (weak) { keepCp(); state.error = weak; return render(); }
   try {
     const data = await Api.post('/api/auth/change-password/request-otp', { currentPassword, newPassword });
+    if (state.form) delete state.form.cp;
     state.otpPurpose = 'change_password';
     state.otpEmail = state.me ? state.me.email : '';
     state.devOtp = (data && data.devOtp) || '';
     state.error = '';
     go('otp');
   } catch (err) {
+    keepCp();
     state.error = err.message;
     render();
   }

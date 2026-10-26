@@ -9,6 +9,19 @@ const { requireAuth, validateBody } = require('../auth');
 
 const router = express.Router();
 
+/* in-memory "who is typing" markers — ephemeral, per request + role.
+   Not persisted (typing state is transient); refreshed by client heartbeats. */
+const typing = {};
+const TYPING_TTL = 8000; /* a marker stays fresh for 8s */
+function setTyping(requestId, role) {
+  typing[requestId] = typing[requestId] || {};
+  typing[requestId][role] = Date.now();
+}
+function peerTyping(requestId, role) {
+  const t = typing[requestId] && typing[requestId][role];
+  return !!t && (Date.now() - t) < TYPING_TTL;
+}
+
 function loadRequest(id) {
   const n = parseInt(id, 10);
   if (!Number.isFinite(n)) return null;
@@ -59,12 +72,15 @@ router.get('/:requestId', requireAuth, (req, res) => {
   if (!canAccess(req.user, dr)) return res.status(403).json({ error: 'Not your request' });
   const messages = q.all(
     'SELECT * FROM request_messages WHERE request_id=? ORDER BY id ASC', dr.id);
+  const myRole = req.user.role === 'admin' ? 'admin' : 'student';
+  const otherRole = myRole === 'admin' ? 'student' : 'admin';
   res.json({
     request: {
       id: dr.id, ref: dr.ref, student_name: dr.student_name,
       doc_type: dr.doc_type, status: dr.status
     },
-    messages
+    messages,
+    peer_typing: peerTyping(dr.id, otherRole)
   });
 });
 
@@ -111,6 +127,15 @@ router.post('/:requestId/read', requireAuth, (req, res) => {
   } else {
     q.run('UPDATE request_messages SET read_student=1 WHERE request_id=? AND sender_role=?', dr.id, 'admin');
   }
+  res.json({ ok: true });
+});
+
+/* POST /api/messages/:requestId/typing — heartbeat so the peer can show "typing…" */
+router.post('/:requestId/typing', requireAuth, (req, res) => {
+  const dr = loadRequest(req.params.requestId);
+  if (!dr) return res.status(404).json({ error: 'Request not found' });
+  if (!canAccess(req.user, dr)) return res.status(403).json({ error: 'Not your request' });
+  setTyping(dr.id, req.user.role === 'admin' ? 'admin' : 'student');
   res.json({ ok: true });
 });
 

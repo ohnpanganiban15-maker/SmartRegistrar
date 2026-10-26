@@ -110,6 +110,33 @@ const evalA = expr => w.eval(expr);
   w.eval(`togglePass('li-pass', document.querySelector('.pass-eye'))`);
   assert(w.document.getElementById('li-pass').type === 'password', 'eye toggle hides password again');
 
+  /* --- register: show-password eye + values preserved on error --- */
+  await w.eval("go('register')");
+  await sleep(120);
+  assert(!!w.document.getElementById('rg-pass') &&
+    !!w.document.querySelector('#rg-pass') , 'register form rendered');
+  /* the eye is a sibling button inside .pass-wrap */
+  assert(!!w.document.querySelector('.pass-wrap .pass-eye'), 'register password has eye toggle');
+  w.document.getElementById('rg-num').value = '123456789012';
+  w.document.getElementById('rg-email').value = 'preserve.test@cdlshs.edu.ph';
+  w.document.getElementById('rg-first').value = 'Preserve';
+  w.document.getElementById('rg-last').value = 'Tester';
+  w.document.getElementById('rg-contact').value = '09171234567';
+  w.document.getElementById('rg-pass').value = 'abc'; /* weak → client-side error, no network */
+  await w.eval("doRegister({ preventDefault: () => {} })");
+  await sleep(120);
+  assert(w.document.getElementById('rg-email').value === 'preserve.test@cdlshs.edu.ph',
+    'register keeps email after error re-render');
+  assert(w.document.getElementById('rg-first').value === 'Preserve',
+    'register keeps first name after error re-render');
+  assert(w.document.getElementById('rg-num').value === '123456789012',
+    'register keeps LRN after error re-render');
+  assert(w.document.getElementById('rg-last').value === 'Tester',
+    'register keeps last name after error re-render');
+  /* back to the login screen for the normal flow below */
+  await w.eval("go('login')");
+  await sleep(80);
+
   /* --- student login --- */
   w.document.getElementById('li-email').value = em1;
   w.document.getElementById('li-pass').value = 'fix12345';
@@ -145,6 +172,33 @@ const evalA = expr => w.eval(expr);
   assert(fs.readFileSync(path.join(pub, 'css/style.css'), 'utf8')
     .includes('[hidden] { display:none !important; }'),
     'chat CSS lets [hidden] override display:flex (window + badge actually hide)');
+
+  /* --- chat typing indicator + read receipts --- */
+  w.eval('Chat.ensure()');
+  assert(w.document.getElementById('chat-typing') !== null,
+    'chat typing indicator element present');
+  w.eval("Chat.paintTyping(true)");
+  assert(w.document.getElementById('chat-typing').hidden === false, 'paintTyping(true) shows indicator');
+  w.eval("Chat.paintTyping(false)");
+  assert(w.document.getElementById('chat-typing').hidden === true, 'paintTyping(false) hides indicator');
+  /* read receipt: my (student) message shows ✓✓; peer message shows none */
+  w.eval("Chat.paint([{ sender_role:'student', body:'hi', created_at:'2026-10-23 10:00:00', read_admin:0 }])");
+  assert(!!w.document.querySelector('.chat-msg.mine .tick'),
+    'read-receipt tick rendered on my (unread) message');
+  assert(!w.document.querySelector('.chat-msg.theirs'), 'my message shown as mine');
+  w.eval("Chat.paint([{ sender_role:'student', body:'hi', created_at:'2026-10-23 10:00:00', read_admin:1 }])");
+  assert(!!w.document.querySelector('.chat-msg.mine .tick.read'),
+    'tick turns to "read" once the peer read flag is set');
+  w.eval("Chat.paint([{ sender_role:'admin', body:'yo', created_at:'2026-10-23 10:00:00', read_student:0 }])");
+  assert(!!w.document.querySelector('.chat-msg.theirs'), 'peer message rendered as theirs');
+  assert(!w.document.querySelector('.chat-msg .tick'), 'no read tick on peer message');
+  /* source-level wiring */
+  assert(fs.readFileSync(path.join(pub, 'js/chat.js'), 'utf8').includes('peer_typing'),
+    'chat client reads peer_typing flag');
+  assert(fs.readFileSync(path.join(pub, 'js/chat.js'), 'utf8').includes('Chat.typing()'),
+    'chat input sends typing heartbeat');
+  assert(fs.readFileSync(path.join(__dirname, 'server/routes/messages.js'), 'utf8').includes('/typing'),
+    'backend typing endpoint present');
 
   /* --- cycle every student view --- */
   const studentViews = ['availability', 'myRequests', 'myAppointments', 'notifications',

@@ -210,6 +210,18 @@ async function call(method, path, token, body) {
   r = await call('POST', '/api/messages/' + reqId + '/read', admin);
   r = await call('GET', '/api/messages/unread-count', admin);
   assert(r.data.count === 0, 'admin unread cleared after read');
+  /* typing heartbeat + peer_typing flag */
+  r = await call('POST', '/api/messages/' + reqId + '/typing', admin);
+  assert(r.status === 200 && r.data.ok, 'admin typing heartbeat accepted');
+  r = await call('GET', '/api/messages/' + reqId, student);
+  assert(r.data.peer_typing === true, 'student sees peer_typing=true while admin types');
+  r = await call('GET', '/api/messages/' + reqId, admin);
+  assert(r.data.peer_typing === false, 'admin does not see self as typing');
+  r = await call('POST', '/api/messages/' + reqId + '/typing', student);
+  r = await call('GET', '/api/messages/' + reqId, admin);
+  assert(r.data.peer_typing === true, 'admin sees peer_typing=true while student types');
+  r = await call('POST', '/api/messages/' + reqId + '/typing', 'garbage.token');
+  assert(r.status === 401, 'typing requires auth');
   r = await call('POST', '/api/messages/' + reqId, student, { text: '   ' });
   assert(r.status === 400, 'empty chat message rejected');
   r = await call('GET', '/api/messages/999999', student);

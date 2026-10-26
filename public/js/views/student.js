@@ -99,7 +99,11 @@ function viewRegister() {
         <div class="field"><label>Contact Number</label>
           <input class="input" id="rg-contact" placeholder="09XX XXX XXXX"></div>
         <div class="field"><label>Password</label>
-          <input class="input" id="rg-pass" type="password" minlength="8" placeholder="at least 8 characters + letters &amp; numbers" required></div>
+          <div class="pass-wrap">
+            <input class="input" id="rg-pass" type="password" minlength="8" placeholder="at least 8 characters + letters &amp; numbers" required>
+            <button type="button" class="pass-eye" onclick="togglePass('rg-pass', this)" title="Show password" aria-label="Show password">👁</button>
+          </div>
+        </div>
         <button class="btn btn-primary btn-block" type="submit">Create account</button>
       </form>
       <div class="auth-switch">Already registered? <a onclick="go('login')">Sign in</a></div>
@@ -157,11 +161,20 @@ function viewChangePassword() {
       ${state.error ? `<div class="form-error">${esc(state.error)}</div>` : ''}
       <form onsubmit="doChangePasswordRequestOtp(event)">
         <div class="field"><label>Current Password</label>
-          <input class="input" id="cp-current" type="password" autocomplete="current-password" required></div>
+          <div class="pass-wrap">
+            <input class="input" id="cp-current" type="password" autocomplete="current-password" required>
+            <button type="button" class="pass-eye" onclick="togglePass('cp-current', this)" title="Show password" aria-label="Show password">👁</button>
+          </div></div>
         <div class="field"><label>New Password</label>
-          <input class="input" id="cp-new" type="password" minlength="8" autocomplete="new-password" placeholder="at least 8 characters + letters &amp; numbers" required></div>
+          <div class="pass-wrap">
+            <input class="input" id="cp-new" type="password" minlength="8" autocomplete="new-password" placeholder="at least 8 characters + letters &amp; numbers" required>
+            <button type="button" class="pass-eye" onclick="togglePass('cp-new', this)" title="Show password" aria-label="Show password">👁</button>
+          </div></div>
         <div class="field"><label>Confirm New Password</label>
-          <input class="input" id="cp-confirm" type="password" minlength="6" autocomplete="new-password" required></div>
+          <div class="pass-wrap">
+            <input class="input" id="cp-confirm" type="password" minlength="6" autocomplete="new-password" required>
+            <button type="button" class="pass-eye" onclick="togglePass('cp-confirm', this)" title="Show password" aria-label="Show password">👁</button>
+          </div></div>
         <button class="btn btn-primary btn-block" type="submit">Send OTP &amp; Continue</button>
       </form>
       <div class="auth-switch">
