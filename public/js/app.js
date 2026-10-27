@@ -221,9 +221,6 @@ function studentShell(content) {
           <a class="${cur === v ? 'active' : ''}" onclick="go('${v}')" href="javascript:void(0)">${lb}</a>`).join('')}
       </nav>
       <div class="topbar-actions">
-        <button class="icon-btn" onclick="go('notifications')" title="Notifications">🔔
-          ${unread ? `<span class="badge-dot pill-count">${unread > 9 ? '9+' : unread}</span>` : ''}</button>
-        ${themeBtnHTML()}
         <button class="icon-btn" onclick="go('myQr')" title="My QR code">▣</button>
         <button class="icon-btn" onclick="askLogout()" title="Log out">↩</button>
       </div>
@@ -232,7 +229,7 @@ function studentShell(content) {
     <nav class="bottom-nav">
       ${nav.map(([v, ic, lb]) => `
         <a class="${cur === v ? 'active' : ''}" onclick="go('${v}')" href="javascript:void(0)">
-          <span class="ic">${ic}</span>${lb}</a>`).join('')}
+          <span class="ic">${ic}${v === 'notifications' && unread ? `<span class="badge-dot pill-count">${unread > 9 ? '9+' : unread}</span>` : ''}</span>${lb}</a>`).join('')}
     </nav>
   </div>`;
 }
@@ -544,10 +541,9 @@ let _reqDraft = null;
 function openRequestForm() {
   const types = state.docTypes && state.docTypes.length
     ? state.docTypes
-    : [{ name: 'Certificate of Enrollment' }, { name: 'Transcript of Records' },
-       { name: 'Good Moral Certificate' }, { name: 'Diploma' }, { name: 'Form 137' },
-       { name: 'Form 138' }, { name: 'SF9' }, { name: 'SF10' },
-       { name: 'Certification' }, { name: 'Other Registrar Documents' }];
+    : [{ name: 'Certificate of Enrollment' }, { name: 'Diploma' },
+       { name: 'SF9' }, { name: 'SF10' },
+       { name: 'Certified True Copy' }, { name: 'Other Registrar Documents' }];
   const p = _reqDraft || {};
   openModal(`
     <div class="modal-head">

@@ -178,6 +178,18 @@ ensureColumn('students', "profile_photo TEXT NOT NULL DEFAULT ''");
 const insertDocType = db.prepare('INSERT OR IGNORE INTO document_types (name) VALUES (?)');
 for (const t of ['SF9', 'SF10']) insertDocType.run(t);
 
+/* ---- doc-type cleanup: drop retired options, rename Certification ----
+   Runs at boot AND again after a persistence restore (an old snapshot may
+   still carry the retired types). Idempotent. */
+function migrateDocTypes() {
+  const drop = db.prepare('DELETE FROM document_types WHERE name=?');
+  for (const t of ['Form 137', 'Form 138', 'Good Moral Certificate', 'Transcript of Records']) drop.run(t);
+  db.prepare("INSERT OR IGNORE INTO document_types (name) VALUES ('Certified True Copy')").run();
+  db.prepare("DELETE FROM document_types WHERE name='Certification'").run();
+  db.prepare("UPDATE document_requests SET doc_type='Certified True Copy' WHERE doc_type='Certification'").run();
+}
+migrateDocTypes();
+
 /* ---- small query helpers used by all routes ---- */
 const q = {
   get: (sql, ...params) => db.prepare(sql).get(...params),
@@ -193,4 +205,4 @@ function logActivity(userId, userName, action, details) {
   );
 }
 
-module.exports = { db, q, logActivity };
+module.exports = { db, q, logActivity, migrateDocTypes };

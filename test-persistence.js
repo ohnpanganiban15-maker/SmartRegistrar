@@ -22,6 +22,8 @@ const assert = (c, msg) => { if (c) { pass++; console.log('PASS:', msg); } else 
 
 (async () => {
   purge();
+  /* remove any leftover test doc type so it never leaks into the app dropdown */
+  q.run("DELETE FROM document_types WHERE name='COG'");
 
   /* seed a couple of linked rows (users ↔ students are circular FKs) */
   q.run("INSERT INTO users (name,email,password_hash,role) VALUES (?,?,?,?)",
@@ -92,6 +94,8 @@ const assert = (c, msg) => { if (c) { pass++; console.log('PASS:', msg); } else 
   assert(usersAfter === usersBefore && usersAfter > 0,
     'local users NOT wiped by empty snapshot (' + usersAfter + ' remain)');
 
+  /* leave the shared local DB exactly as we found it (no test doc type) */
+  try { q.run("DELETE FROM document_types WHERE name='COG'"); } catch (e) {}
   try { fs.unlinkSync(tmp); } catch (e) {}
   console.log('\nResults: ' + pass + ' passed, ' + fail + ' failed');
   process.exit(fail ? 1 : 0);

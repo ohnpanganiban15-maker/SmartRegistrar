@@ -70,8 +70,8 @@ function seed() {
 
   /* ---- document types ---- */
   const docTypes = [
-    'Certificate of Enrollment', 'Transcript of Records', 'Good Moral Certificate',
-    'Diploma', 'Form 137', 'Form 138', 'SF9', 'SF10', 'Certification', 'Other Registrar Documents'
+    'Certificate of Enrollment', 'Diploma', 'SF9', 'SF10',
+    'Certified True Copy', 'Other Registrar Documents'
   ];
   for (const name of docTypes) q.run('INSERT OR IGNORE INTO document_types (name) VALUES (?)', name);
 
@@ -94,10 +94,10 @@ function seed() {
     };
     const appts = [
       [studentIds[0], 'Certificate of Enrollment', 'Scholarship application', slotIds[0], 'Pending'],
-      [studentIds[1], 'Transcript of Records', 'College application', slotIds[3], 'Approved'],
-      [studentIds[2], 'Good Moral Certificate', 'Job application of parent', slotIds[6], 'Completed'],
-      [studentIds[0], 'Form 137', 'Transfer requirement', slotIds[10], 'Pending'],
-      [studentIds[3], 'Certification', 'Scholarship requirement', slotIds[13], 'Approved']
+      [studentIds[1], 'Certificate of Enrollment', 'College application', slotIds[3], 'Approved'],
+      [studentIds[2], 'Diploma', 'Job application of parent', slotIds[6], 'Completed'],
+      [studentIds[0], 'Certified True Copy', 'Transfer requirement', slotIds[10], 'Pending'],
+      [studentIds[3], 'Certified True Copy', 'Scholarship requirement', slotIds[13], 'Approved']
     ];
     for (const [sid, service, purpose, slot, status] of appts) {
       const r = q.run(
@@ -111,10 +111,10 @@ function seed() {
     /* ---- sample document requests ---- */
     const requests = [
       [studentIds[0], 'Certificate of Enrollment', 2, 'Scholarship application', dates[1], '', 'Processing'],
-      [studentIds[1], 'Form 137', 1, 'College admission', dates[2], 'Sealed copy please', 'Ready for Pickup'],
-      [studentIds[4], 'Good Moral Certificate', 1, 'Sports tryout', dates[3], '', 'Pending'],
-      [studentIds[5], 'Transcript of Records', 1, 'Transfer to another school', dates[4], '', 'Completed'],
-      [studentIds[2], 'Certification', 3, 'Scholarship', dates[5], '', 'Pending']
+      [studentIds[1], 'Certified True Copy', 1, 'College admission', dates[2], 'Sealed copy please', 'Ready for Pickup'],
+      [studentIds[4], 'Diploma', 1, 'Sports tryout', dates[3], '', 'Pending'],
+      [studentIds[5], 'Certificate of Enrollment', 1, 'Transfer to another school', dates[4], '', 'Completed'],
+      [studentIds[2], 'Certified True Copy', 3, 'Scholarship', dates[5], '', 'Pending']
     ];
     for (const [sid, type, qty, purpose, pickup, notes, status] of requests) {
       const r = q.run(
@@ -136,8 +136,8 @@ function seed() {
     /* ---- customer service messages ---- */
     const allUsers = q.all("SELECT id, name FROM users WHERE role='student'");
     q.run('INSERT INTO messages (user_id, student_name, subject, body, status) VALUES (?,?,?,?,?)',
-      allUsers[0].id, allUsers[0].name, 'Question about Form 137',
-      'Good day! How many working days does it take to process Form 137?', 'Open');
+      allUsers[0].id, allUsers[0].name, 'Question about Certificate of Enrollment',
+      'Good day! How many working days does it take to process a Certificate of Enrollment?', 'Open');
     q.run(`INSERT INTO messages (user_id, student_name, subject, body, admin_reply, status, replied_at) VALUES (?,?,?,?,?,?,datetime('now'))`,
       allUsers[1].id, allUsers[1].name, 'Pickup schedule inquiry',
       'When can I claim my Certificate of Enrollment?',

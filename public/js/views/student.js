@@ -201,7 +201,7 @@ function viewDashboard() {
   <div class="page-head">
     <div><h2>${greet}, ${esc(st.first_name || me.name || 'Student')}!</h2>
       <div class="sub">Here's what's happening in your account today.</div></div>
-    ${themeBtnHTML()}
+    
   </div>
 
   <div class="panel id-card">
@@ -260,7 +260,7 @@ function annHTML(a) {
 function viewAnnouncements() {
   const anns = state.anns || [];
   return `
-  <div class="page-head"><h2>Announcements <span class="sub">from the Registrar</span></h2>${themeBtnHTML()}</div>
+  <div class="page-head"><h2>Announcements <span class="sub">from the Registrar</span></h2></div>
   ${anns.length ? anns.map(annHTML).join('') : '<div class="card empty"><div class="big">📢</div>No announcements yet.</div>'}`;
 }
 
@@ -272,7 +272,7 @@ function viewAvailability() {
   return `
   <div class="page-head">
     <div><h2>Pickup Schedule</h2><div class="sub">When you can claim your documents at the registrar.</div></div>
-    ${themeBtnHTML()}
+    
   </div>
 
   <div class="panel">
@@ -327,7 +327,7 @@ function viewMyAppointments() {
   return `
   <div class="page-head">
     <div><h2>My Appointments</h2><div class="sub">${appts.length} record(s)</div></div>
-    ${themeBtnHTML()}
+    
   </div>
   <div class="filters">
     ${['', 'Pending', 'Approved', 'Completed', 'Cancelled', 'Rejected'].map(st => `
@@ -393,7 +393,7 @@ function viewNotifications() {
     <div class="flex">
       <button class="btn btn-sm btn-ghost" onclick="toggleNotifSound()">${notifSoundOn() ? 'Sound: ON' : 'Sound: OFF'}</button>
       <button class="btn btn-sm btn-ghost" onclick="markAllRead()">Mark all read</button>
-      ${themeBtnHTML()}
+      
     </div>
   </div>
   ${notifs.length === 0 ? '<div class="card empty"><div class="big">🔔</div>No notifications yet.</div>' :
@@ -413,13 +413,13 @@ function viewService() {
   const msgs = state.chats || [];
   const anns = state.anns || [];
   return `
-  <div class="page-head"><h2>Customer Service <span class="sub">Ask the registrar</span></h2>${themeBtnHTML()}</div>
+  <div class="page-head"><h2>Customer Service <span class="sub">Ask the registrar</span></h2></div>
 
   <div class="panel">
     <div class="panel-title">Send an inquiry</div>
     ${state.error ? `<div class="error-box">${esc(state.error)}</div>` : ''}
     <div class="field"><label>Subject</label>
-      <input class="input" id="ch-subject" placeholder="e.g., Question about Form 137"></div>
+      <input class="input" id="ch-subject" placeholder="e.g., Question about Certificate of Enrollment"></div>
     <div class="field"><label>Message</label>
       <textarea class="input" id="ch-body" placeholder="Type your question or concern…"></textarea></div>
     <button class="btn btn-primary" onclick="sendChat()">Send message</button>
@@ -449,7 +449,7 @@ function viewMyQr() {
   const reqs = (state.requests || []).filter(r => ['Pending', 'Processing', 'Ready for Pickup'].includes(r.status));
   const stuCode = 'STU-' + (st.student_number || me.id);
   return `
-  <div class="page-head"><h2>My QR Code</h2>${themeBtnHTML()}</div>
+  <div class="page-head"><h2>My QR Code</h2></div>
 
   <div class="panel" style="text-align:center;">
     <div class="muted small">Student verification code — show this at the registrar counter.</div>

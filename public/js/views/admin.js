@@ -14,7 +14,7 @@ function viewAdminDashboard() {
   <div class="page-head">
     <div><h2>Registrar Dashboard</h2>
       <div class="sub">${schoolYear()} · ${currentSem()} · Overview of requests, students and pickup schedule</div></div>
-    ${themeBtnHTML()}
+    
   </div>
 
   <div class="stat-grid">
@@ -178,7 +178,7 @@ function viewAdminAppointments() {
   return `
   <div class="page-head">
     <div><h2>Appointment Management</h2><div class="sub">${list.length} appointment(s)</div></div>
-    ${themeBtnHTML()}
+    
   </div>
   <div class="filters">
     <input class="input" id="as-search" placeholder="Search ref, student, service…" value="${esc(f.search || '')}"
@@ -234,7 +234,7 @@ function viewAdminRequests() {
   return `
   <div class="page-head">
     <div><h2>Document Requests</h2><div class="sub">${list.length} request(s)</div></div>
-    ${themeBtnHTML()}
+    
   </div>
   <div class="filters">
     <input class="input" id="rs-search" placeholder="Search ref, student, type…" value="${esc(f.search || '')}"
@@ -330,7 +330,7 @@ function viewAdminAvailability() {
 /* ---------------- QR SCANNER ---------------- */
 function viewAdminScanner() {
   return `
-  <div class="page-head"><h2>QR Scanner <span class="sub">Scan or type a reference code</span></h2>${themeBtnHTML()}</div>
+  <div class="page-head"><h2>QR Scanner <span class="sub">Scan or type a reference code</span></h2></div>
 
   <div class="panel">
     <div class="panel-title">Scan with camera</div>
@@ -358,7 +358,7 @@ function viewAdminScanner() {
 function viewAdminAnnouncements() {
   const anns = state.anns || [];
   return `
-  <div class="page-head"><h2>Announcements</h2>${themeBtnHTML()}</div>
+  <div class="page-head"><h2>Announcements</h2></div>
   <div class="panel">
     <div class="panel-title">Post a new announcement</div>
     <div class="field"><label>Title</label><input class="input" id="an-title" placeholder="e.g., Clearance schedule"></div>
@@ -385,7 +385,7 @@ function viewAdminService() {
   return `
   <div class="page-head">
     <div><h2>Customer Service</h2><div class="sub">${msgs.filter(m => m.status === 'Open').length} open inquiry(s)</div></div>
-    ${themeBtnHTML()}
+    
   </div>
   <div class="filters">
     ${['', 'Open', 'Resolved'].map(st => `
@@ -410,7 +410,7 @@ function viewAdminService() {
 function viewAdminLogs() {
   const logs = state.logs || [];
   return `
-  <div class="page-head"><h2>System Activity Logs</h2>${themeBtnHTML()}</div>
+  <div class="page-head"><h2>System Activity Logs</h2></div>
   ${logs.length === 0 ? '<div class="card empty">No activity recorded yet.</div>' : `
   <div class="table-wrap"><table class="rtable">
     <thead><tr><th>Time</th><th>User</th><th>Action</th><th>Details</th></tr></thead>
@@ -433,7 +433,7 @@ function viewAdminReports() {
     Completed: 'var(--success)', Cancelled: 'var(--danger)', Rejected: 'var(--danger)'
   };
   return `
-  <div class="page-head"><h2>Reports</h2>${themeBtnHTML()}</div>
+  <div class="page-head"><h2>Reports</h2></div>
 
   <div class="grid-2">
     <div class="panel">

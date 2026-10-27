@@ -125,7 +125,7 @@ async function call(method, path, token, body) {
 
   /* --- document requests --- */
   r = await call('GET', '/api/requests/types', student);
-  assert(r.status === 200 && r.data.length >= 8, 'document types list (' + r.data.length + ')');
+  assert(r.status === 200 && r.data.length >= 6, 'document types list (' + r.data.length + ')');
   r = await call('POST', '/api/requests', student, { docType: 'Form 138', quantity: 2, purpose: 'Enrollment', pickupDate: '2026-10-20' });
   assert(r.status === 201 && /^REQ-\d{4}$/.test(r.data.ref), 'submit request → ' + (r.data && r.data.ref));
   assert(r.data.pickup_date === '', 'student cannot set pickup date (left empty for admin)');
