@@ -64,8 +64,11 @@ app.use((err, req, res, next) => {
 
 /* ---- start ---- */
 /* restore a cloud snapshot FIRST if the local DB is empty (Render redeploys
-   wipe the ephemeral disk). Runs in the background — never blocks startup. */
-try { require('./persistence').init(); } catch (e) { console.error('[persistence]', e.message); }
+   wipe the ephemeral disk). Runs in the background — never blocks startup.
+   After the restore settles, announceIfChanged() posts an announcement
+   whenever this boot runs a different build than the last one. */
+const { announceIfChanged } = require('./version');
+try { require('./persistence').init(announceIfChanged); } catch (e) { console.error('[persistence]', e.message); announceIfChanged(); }
 seed(); /* sample data only created when the DB is empty */
 
 app.listen(config.PORT, config.HOST, () => {

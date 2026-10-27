@@ -153,6 +153,11 @@ CREATE TABLE IF NOT EXISTS otps (
   created_at  TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
+CREATE TABLE IF NOT EXISTS app_meta (
+  key   TEXT PRIMARY KEY,
+  value TEXT NOT NULL
+);
+
 CREATE INDEX IF NOT EXISTS idx_appt_slot     ON appointments(slot_id);
 CREATE INDEX IF NOT EXISTS idx_appt_student  ON appointments(student_id);
 CREATE INDEX IF NOT EXISTS idx_req_student   ON document_requests(student_id);

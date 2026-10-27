@@ -1179,4 +1179,57 @@ setInterval(async () => {
   }
 }, 12000);
 
+/* ---------- app update notifier ----------
+   Compares the live server build against the build this page loaded with.
+   A mismatch means a new deploy happened — show a banner; tapping it
+   reloads the page (web) or opens the fresh APK download (native). */
+const AppUpdate = {
+  bootVersion: null,
+  bannerShown: false,
+
+  async check() {
+    let r;
+    try { r = await Api.get('/api/app/version'); } catch (e) { return; }
+    if (!r || !r.version) return;
+    if (!this.bootVersion) { this.bootVersion = r.version; return; } /* baseline */
+    if (r.version !== this.bootVersion) this.show(r.version);
+  },
+
+  show(v) {
+    if (this.bannerShown || document.getElementById('update-bar')) return;
+    this.bannerShown = true;
+    const bar = document.createElement('div');
+    bar.id = 'update-bar';
+    bar.className = 'update-bar';
+    bar.innerHTML =
+      '<span class="upd-ic">\u{1F504}</span>' +
+      '<div class="upd-txt"><b>May bagong update ang app!</b>' +
+      '<span class="upd-sub">Version ' + esc(v) + ' — i-tap para ma-update</span></div>' +
+      '<button class="upd-btn" onclick="AppUpdate.apply()">I-update</button>' +
+      '<button class="upd-x" onclick="AppUpdate.dismiss()" aria-label="Dismiss">\u2715</button>';
+    document.body.appendChild(bar);
+    try { notifyPulse(); } catch (e) {}
+    toast('May bagong version ang app — i-tap ang banner sa itaas.', 'info');
+  },
+
+  dismiss() {
+    const b = document.getElementById('update-bar');
+    if (b) b.remove();
+  },
+
+  apply() {
+    if (Api.isNative()) {
+      /* APK: bundled code cannot rewrite itself — open the fresh installer */
+      window.open(Api.defaultServer + '/downloads/SmartRegistrar.apk', '_blank');
+      toast('Mag-download at mag-install ng bagong APK para ma-update.', 'info');
+      return;
+    }
+    /* web: reload with a cache-busting param so the new build is fetched */
+    location.href = location.pathname + '?v=' + Date.now();
+  }
+};
+setInterval(() => { AppUpdate.check(); }, 60000);
+document.addEventListener('visibilitychange', () => { if (!document.hidden) AppUpdate.check(); });
+AppUpdate.check();
+
 boot();

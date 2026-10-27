@@ -7,8 +7,16 @@ const fs = require('fs');
 const path = require('path');
 const { q, db, logActivity } = require('../db');
 const { requireAuth, requireAdmin } = require('../auth');
+const { version, bootedAt } = require('../version');
 
 const router = express.Router();
+
+/* GET /api/app/version — public: which build is live (update notifier).
+   Clients compare this against the build they loaded; a mismatch means
+   a new deploy happened and the "update available" banner is shown. */
+router.get('/app/version', (req, res) => {
+  res.json({ version, updated_at: bootedAt, name: 'CDLSHS Smart Registrar' });
+});
 
 /* GET /api/dashboard/stats — numbers for dashboard cards */
 router.get('/dashboard/stats', requireAuth, (req, res) => {

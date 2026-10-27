@@ -362,6 +362,11 @@ async function call(method, path, token, body) {
   r = await call('GET', '/api/nope', admin);
   assert(r.status === 404, 'unknown API route → JSON 404');
 
+  /* --- app version (update notifier, public — no token) --- */
+  r = await call('GET', '/api/app/version');
+  assert(r.status === 200 && typeof r.data.version === 'string' && r.data.version.length > 0 &&
+    r.data.updated_at, 'app version endpoint (public)');
+
   /* --- frontend served --- */
   const home = await fetch(BASE + '/');
   const html = await home.text();

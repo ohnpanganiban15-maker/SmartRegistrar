@@ -306,6 +306,17 @@ const evalA = expr => w.eval(expr);
   await sleep(100);
   assert(w.document.getElementById('li-email') !== null, 'logout returns to login screen');
 
+  /* --- app update notifier (banner shown when server build differs) --- */
+  assert(evalA(`typeof AppUpdate`) === 'object', 'AppUpdate notifier present');
+  evalA(`AppUpdate.show('testver')`);
+  await sleep(50);
+  const updBar = w.document.getElementById('update-bar');
+  assert(updBar !== null, 'update banner renders');
+  assert(updBar !== null && updBar.innerHTML.includes('I-update') && updBar.innerHTML.includes('testver'),
+    'update banner shows version + update button');
+  evalA(`AppUpdate.dismiss()`);
+  assert(w.document.getElementById('update-bar') === null, 'update banner dismissable');
+
   /* leave the database example-free for the user */
   purge();
 

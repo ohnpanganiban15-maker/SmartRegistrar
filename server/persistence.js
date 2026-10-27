@@ -23,7 +23,7 @@ const { db, q, migrateDocTypes } = require('./db');
 
 /* tables in a stable order (FK checks are disabled during restore) */
 const TABLES = [
-  'students', 'users', 'appointment_slots', 'appointments', 'document_types',
+  'app_meta', 'students', 'users', 'appointment_slots', 'appointments', 'document_types',
   'document_requests', 'notifications', 'messages', 'announcements',
   'request_messages', 'activity_logs', 'otps'
 ];
@@ -152,19 +152,24 @@ async function restoreIfEmpty() {
 }
 
 let _timer = null;
-function init() {
+function init(onReady) {
   const configured = !!(supabaseCfg() || process.env.PERSIST_FILE);
   /* restore in the background so startup is never blocked */
   restoreIfEmpty().then(function () {
-    if (!configured) return;
-    if (_timer) clearInterval(_timer);
-    _timer = setInterval(pushNow, 60000); /* keep the cloud copy fresh */
-    /* push on graceful shutdown so the last state is saved */
-    const flush = function () { pushNow().then(function () { process.exit(0); }); };
-    process.once('SIGTERM', flush);
-    process.once('SIGINT', flush);
-    console.log('[persistence] enabled (every 60s)');
-  }).catch(function (e) { console.error('[persistence]', e.message); });
+    if (configured) {
+      if (_timer) clearInterval(_timer);
+      _timer = setInterval(pushNow, 60000); /* keep the cloud copy fresh */
+      /* push on graceful shutdown so the last state is saved */
+      const flush = function () { pushNow().then(function () { process.exit(0); }); };
+      process.once('SIGTERM', flush);
+      process.once('SIGINT', flush);
+      console.log('[persistence] enabled (every 60s)');
+    }
+    if (onReady) { try { onReady(); } catch (e) { console.error('[persistence] onReady:', e.message); } }
+  }).catch(function (e) {
+    console.error('[persistence]', e.message);
+    if (onReady) { try { onReady(); } catch (e2) { console.error('[persistence] onReady:', e2.message); } }
+  });
 }
 
 module.exports = {
