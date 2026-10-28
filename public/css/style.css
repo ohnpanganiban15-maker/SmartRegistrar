@@ -349,12 +349,23 @@ html[data-theme="dark"] .topbar-nav a.active { color:var(--primary-deep); }
 }
 .bottom-nav a .ic { font-size:19px; line-height:1; transition:transform .22s cubic-bezier(.2,.9,.3,1.4); }
 .bottom-nav a.active { color:var(--primary); font-weight:800; }
-.bottom-nav a.active::before {
-  content:''; position:absolute; top:3px; left:50%; transform:translateX(-50%);
-  width:46px; height:33px; border-radius:99px; background:var(--grad-primary); z-index:-1;
+.bottom-nav .nav-pill {
+  position:absolute; top:5px; left:0; width:56px; height:34px; border-radius:99px;
+  background:var(--grad-primary); z-index:0; pointer-events:none;
   box-shadow:0 6px 16px -4px rgba(15,76,129,.55);
+  transition:transform .5s cubic-bezier(.34,1.56,.64,1);
 }
-.bottom-nav a.active .ic { transform:translateY(-2px) scale(1.14); }
+.bottom-nav a { z-index:1; }
+.bottom-nav a.active .ic {
+  color:#fff; transform:translateY(-1px) scale(1.16);
+  animation:navPop .45s cubic-bezier(.34,1.56,.64,1);
+}
+@keyframes navPop {
+  0%   { transform:scale(1); }
+  45%  { transform:scale(1.32) translateY(-3px); }
+  75%  { transform:scale(.94); }
+  100% { transform:scale(1.16) translateY(-1px); }
+}
 .bottom-nav a:hover { color:var(--primary); }
 .bottom-nav a .ic { position:relative; }
 .bottom-nav .badge-dot { position:absolute; top:-8px; right:-14px; min-width:16px; height:16px; padding:0 4px; font-size:9.5px; }
@@ -1060,9 +1071,18 @@ html[data-theme="dark"] .rtable tbody tr:nth-child(even) td { background:rgba(11
 .rtable tbody tr:hover td:first-child { box-shadow:inset 3px 0 0 var(--primary); }
 .rtable td { border-bottom:1px solid var(--border); }
 
-/* ---------- side nav polish ---------- */
+/* ---------- side nav polish (sliding pill) ---------- */
+.side-items { position:relative; }
 .side-item { border-radius:14px; }
-.side-item.active { box-shadow:0 10px 24px -8px rgba(232,161,61,.65), inset 0 1px 0 rgba(255,255,255,.45); }
+.side-items .side-pill {
+  position:absolute; left:12px; right:12px; top:0; height:41px; border-radius:14px;
+  background:var(--grad-accent); z-index:0; pointer-events:none;
+  box-shadow:0 10px 24px -8px rgba(232,161,61,.65), inset 0 1px 0 rgba(255,255,255,.45);
+  transition:transform .5s cubic-bezier(.34,1.56,.64,1);
+}
+.side-item { z-index:1; }
+.side-item.active { background:transparent; color:#3A2504; font-weight:800; box-shadow:none; transform:none; }
+.side-item.active .ic { animation:navPop .45s cubic-bezier(.34,1.56,.64,1); }
 .topbar-nav a { border-radius:999px; }
 .topbar-nav a.active {
   background:var(--grad-primary); color:#fff;

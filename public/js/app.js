@@ -150,6 +150,9 @@ function render() {
   if (state.me && state.me.role === 'admin') app.innerHTML = adminShell(content);
   else app.innerHTML = studentShell(content);
 
+  syncBottomNav();
+  syncSidebar();
+
   /* restore caret when a filter input re-rendered */
   if (_restoreFocusId) {
     const el = document.getElementById(_restoreFocusId);
@@ -226,10 +229,11 @@ function studentShell(content) {
       </div>
     </header>
     <main class="content">${content}</main>
-    <nav class="bottom-nav">
+    <nav class="bottom-nav" data-navkey="student">
+      <span class="nav-pill" aria-hidden="true"></span>
       ${nav.map(([v, ic, lb]) => `
-        <a class="${cur === v ? 'active' : ''}" onclick="go('${v}')" href="javascript:void(0)">
-          <span class="ic">${ic}${v === 'notifications' && unread ? `<span class="badge-dot pill-count">${unread > 9 ? '9+' : unread}</span>` : ''}</span>${lb}</a>`).join('')}
+        <a data-view="${v}" class="${cur === v ? 'active' : ''}" onclick="go('${v}')" href="javascript:void(0)">
+          <span class="ic">${ic}${v === 'notifications' ? `<span class="badge-dot pill-count"${unread ? '' : ' style="display:none"'}>${unread > 9 ? '9+' : unread}</span>` : ''}</span>${lb}</a>`).join('')}
     </nav>
   </div>`;
 }
@@ -257,12 +261,13 @@ function adminShell(content) {
         <div class="brand-logo"><img src="assets/logo.jpg" alt="CDLSHS logo"></div>
         <b>CDLSHS<br>Registrar Admin</b>
       </div>
-      <div class="side-items">
+      <div class="side-items" data-navkey="admin-side">
+        <span class="side-pill" aria-hidden="true"></span>
         ${items.map(([v, ic, lb]) => `
-          <button class="side-item ${cur === v ? 'active' : ''}" onclick="go('${v}')">
+          <button data-view="${v}" class="side-item ${cur === v ? 'active' : ''}" onclick="go('${v}')">
             <span class="ic">${ic}</span>${lb}
-            ${v === 'adminService' && openChats ? `<span class="side-badge">${openChats > 9 ? '9+' : openChats}</span>` : ''}
-            ${v === 'adminRequests' && state.pendingReq ? `<span class="side-badge">${state.pendingReq > 9 ? '9+' : state.pendingReq}</span>` : ''}
+            ${v === 'adminService' ? `<span class="side-badge" data-count="chats"${openChats ? '' : ' style="display:none"'}>${openChats > 9 ? '9+' : openChats}</span>` : ''}
+            ${v === 'adminRequests' ? `<span class="side-badge" data-count="pending"${state.pendingReq ? '' : ' style="display:none"'}>${state.pendingReq > 9 ? '9+' : state.pendingReq}</span>` : ''}
           </button>`).join('')}
         <button class="side-item" onclick="askLogout()"><span class="ic">↩</span>Log out</button>
       </div>
@@ -284,16 +289,118 @@ function adminShell(content) {
       </header>
       <main class="content">${content}</main>
     </div>
-    <nav class="bottom-nav">
+    <nav class="bottom-nav" data-navkey="admin">
+      <span class="nav-pill" aria-hidden="true"></span>
       ${mobileNav.map(([v, ic, lb]) => v === '__menu'
         ? `<a href="javascript:void(0)" onclick="toggleSidebar()"><span class="ic">${ic}</span>${lb}</a>`
-        : `<a class="${cur === v ? 'active' : ''}" onclick="go('${v}')" href="javascript:void(0)">
-            <span class="ic">${ic}${v === 'adminRequests' && state.pendingReq ? `<span class="badge-dot pill-count">${state.pendingReq > 9 ? '9+' : state.pendingReq}</span>` : ''}</span>${lb}</a>`).join('')}
+        : `<a data-view="${v}" class="${cur === v ? 'active' : ''}" onclick="go('${v}')" href="javascript:void(0)">
+            <span class="ic">${ic}${v === 'adminRequests' ? `<span class="badge-dot pill-count"${state.pendingReq ? '' : ' style="display:none"'}>${state.pendingReq > 9 ? '9+' : state.pendingReq}</span>` : ''}</span>${lb}</a>`).join('')}
     </nav>
   </div>`;
 }
 
 function toggleSidebar() { state.sidebarOpen = !state.sidebarOpen; render(); }
+
+/* ---------- bottom-nav sliding pill ----------
+   The nav node is reused across renders (same tabs) so the pill element
+   survives the DOM rebuild and can slide smoothly between tabs. */
+let _navCache = null;
+
+function placeNavPill(nav, instant) {
+  const pill = nav && nav.querySelector('.nav-pill');
+  const active = nav && nav.querySelector('a.active');
+  if (!pill || !active) return;
+  const x = active.offsetLeft + (active.offsetWidth - pill.offsetWidth) / 2;
+  if (instant) {
+    pill.style.transition = 'none';
+    pill.style.transform = 'translateX(' + x + 'px)';
+    void pill.offsetWidth; /* reflow so the next move animates */
+    pill.style.transition = '';
+  } else {
+    pill.style.transform = 'translateX(' + x + 'px)';
+  }
+}
+
+function syncBottomNav() {
+  const fresh = document.querySelector('.bottom-nav');
+  if (!fresh) { _navCache = null; return; }
+  const key = fresh.getAttribute('data-navkey');
+  let nav = fresh;
+  if (_navCache && _navCache.key === key) {
+    fresh.replaceWith(_navCache.el); /* keep the same node (pill survives) */
+    nav = _navCache.el;
+  } else {
+    _navCache = { key, el: fresh };
+  }
+  nav.querySelectorAll('a[data-view]').forEach(a =>
+    a.classList.toggle('active', a.getAttribute('data-view') === state.view));
+  const badge = nav.querySelector('.badge-dot');
+  if (badge) {
+    const n = state.unread || 0;
+    badge.textContent = n > 9 ? '9+' : String(n);
+    badge.style.display = n ? '' : 'none';
+  }
+  placeNavPill(nav, true);
+}
+
+/* ---------- sidebar sliding pill (admin) ----------
+   Same idea as the bottom nav: the sidebar node is reused across renders
+   so the pill survives and slides vertically between menu items. */
+let _sideCache = null;
+
+function placeSidePill(box, instant) {
+  const pill = box && box.querySelector('.side-pill');
+  const active = box && box.querySelector('.side-item.active');
+  if (!pill || !active) return;
+  pill.style.height = active.offsetHeight + 'px';
+  const y = active.offsetTop;
+  if (instant) {
+    pill.style.transition = 'none';
+    pill.style.transform = 'translateY(' + y + 'px)';
+    void pill.offsetHeight; /* reflow so the next move animates */
+    pill.style.transition = '';
+  } else {
+    pill.style.transform = 'translateY(' + y + 'px)';
+  }
+}
+
+function syncSidebar() {
+  const fresh = document.querySelector('.side-items');
+  if (!fresh) { _sideCache = null; return; }
+  let box = fresh;
+  if (_sideCache) { fresh.replaceWith(_sideCache.el); box = _sideCache.el; }
+  else _sideCache = { el: fresh };
+  box.querySelectorAll('.side-item[data-view]').forEach(b =>
+    b.classList.toggle('active', b.getAttribute('data-view') === state.view));
+  const chats = (state.chats || []).filter(m => m.status === 'Open').length;
+  box.querySelectorAll('.side-badge[data-count="chats"]').forEach(el => {
+    el.textContent = chats > 9 ? '9+' : String(chats);
+    el.style.display = chats ? '' : 'none';
+  });
+  const pend = state.pendingReq || 0;
+  box.querySelectorAll('.side-badge[data-count="pending"]').forEach(el => {
+    el.textContent = pend > 9 ? '9+' : String(pend);
+    el.style.display = pend ? '' : 'none';
+  });
+  placeSidePill(box, true);
+}
+
+/* slide the pill the moment a tab is tapped (before data loads + render) */
+document.addEventListener('click', function (e) {
+  if (!e.target || !e.target.closest) return;
+  const a = e.target.closest('.bottom-nav a[data-view]');
+  if (a) {
+    const nav = a.closest('.bottom-nav');
+    nav.querySelectorAll('a').forEach(x => x.classList.toggle('active', x === a));
+    placeNavPill(nav, false);
+  }
+  const b = e.target.closest('.side-item[data-view]');
+  if (b) {
+    const box = b.closest('.side-items');
+    box.querySelectorAll('.side-item').forEach(x => x.classList.toggle('active', x === b));
+    placeSidePill(box, false);
+  }
+});
 
 /* ---------- badges ---------- */
 async function updateUnread() {
