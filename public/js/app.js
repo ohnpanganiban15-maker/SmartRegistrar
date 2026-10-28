@@ -1310,13 +1310,13 @@ const AppUpdate = {
     bar.className = 'update-bar';
     bar.innerHTML =
       '<span class="upd-ic">\u{1F504}</span>' +
-      '<div class="upd-txt"><b>May bagong update ang app!</b>' +
-      '<span class="upd-sub">Version ' + esc(v) + ' — i-tap para ma-update</span></div>' +
-      '<button class="upd-btn" onclick="AppUpdate.apply()">I-update</button>' +
+      '<div class="upd-txt"><b>A new update is available!</b>' +
+      '<span class="upd-sub">Version ' + esc(v) + ' - tap to update</span></div>' +
+      '<button class="upd-btn" onclick="AppUpdate.apply()">Update</button>' +
       '<button class="upd-x" onclick="AppUpdate.dismiss()" aria-label="Dismiss">\u2715</button>';
     document.body.appendChild(bar);
     try { notifyPulse(); } catch (e) {}
-    toast('May bagong version ang app — i-tap ang banner sa itaas.', 'info');
+    toast('A new app version is available - tap the banner at the top to update.', 'info');
   },
 
   dismiss() {
@@ -1328,7 +1328,7 @@ const AppUpdate = {
     if (Api.isNative()) {
       /* APK: bundled code cannot rewrite itself — open the fresh installer */
       window.open(Api.defaultServer + '/downloads/SmartRegistrar.apk', '_blank');
-      toast('Mag-download at mag-install ng bagong APK para ma-update.', 'info');
+      toast('Download and install the new APK to update.', 'info');
       return;
     }
     /* web: reload with a cache-busting param so the new build is fetched */

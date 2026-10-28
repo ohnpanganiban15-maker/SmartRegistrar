@@ -312,7 +312,7 @@ const evalA = expr => w.eval(expr);
   await sleep(50);
   const updBar = w.document.getElementById('update-bar');
   assert(updBar !== null, 'update banner renders');
-  assert(updBar !== null && updBar.innerHTML.includes('I-update') && updBar.innerHTML.includes('testver'),
+  assert(updBar !== null && updBar.innerHTML.includes('Update') && updBar.innerHTML.includes('testver'),
     'update banner shows version + update button');
   evalA(`AppUpdate.dismiss()`);
   assert(w.document.getElementById('update-bar') === null, 'update banner dismissable');

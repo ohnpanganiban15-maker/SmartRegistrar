@@ -37,7 +37,7 @@ function announceIfChanged() {
     q.run("UPDATE app_meta SET value=? WHERE key='app_version'", version);
     q.run('INSERT INTO announcements (title, body) VALUES (?,?)',
       'App Updated \u{1F680}',
-      'Version ' + version + ' is now live — may mga bagong features at fixes. ' +
+      'Version ' + version + ' is now live - new features and improvements. ' +
       'Refresh the page (or reopen the app) to get the latest version.');
     logActivity(null, 'System', 'APP_UPDATED', 'version ' + row.value + ' -> ' + version);
     console.log('[version] app updated: ' + row.value + ' -> ' + version);
