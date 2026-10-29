@@ -183,6 +183,9 @@ ensureColumn('students', "profile_photo TEXT NOT NULL DEFAULT ''");
 const insertDocType = db.prepare('INSERT OR IGNORE INTO document_types (name) VALUES (?)');
 for (const t of ['SF9', 'SF10']) insertDocType.run(t);
 
+/* ---- google sign-in: link column (added once, safe on old DBs) ---- */
+try { db.exec('ALTER TABLE users ADD COLUMN google_sub TEXT'); } catch (e) { /* already exists */ }
+
 /* ---- doc-type cleanup: drop retired options, rename Certification ----
    Runs at boot AND again after a persistence restore (an old snapshot may
    still carry the retired types). Idempotent. */

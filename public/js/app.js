@@ -20,11 +20,13 @@ const state = {
   unread: 0,
   pendingReq: 0,
   sidebarOpen: false,
-  otpPurpose: '', otpEmail: '', devOtp: ''
+  otpPurpose: '', otpEmail: '', devOtp: '',
+  appConfig: null,
+  gp: null
 };
 
 const VIEWS = {
-  login: viewLogin, register: viewRegister, otp: viewOtp, changePassword: viewChangePassword, dashboard: viewDashboard,
+  login: viewLogin, register: viewRegister, googleProfile: viewGoogleProfile, otp: viewOtp, changePassword: viewChangePassword, dashboard: viewDashboard,
   availability: viewAvailability, apptConfirmed: viewApptConfirmed,
   myAppointments: viewMyAppointments, myRequests: viewMyRequests,
   notifications: viewNotifications, service: viewService, myQr: viewMyQr,
@@ -53,7 +55,7 @@ function themeBtnHTML() {
 /* ---------- data loading per view ---------- */
 async function loadView(view) {
   switch (view) {
-    case 'login': case 'register': case 'otp': case 'changePassword': return;
+    case 'login': case 'register': case 'otp': case 'changePassword': case 'googleProfile': return;
     case 'dashboard': {
       const [stats, appts, slots, anns] = await Promise.all([
         Api.get('/api/dashboard/stats'), Api.get('/api/appointments'),
@@ -117,7 +119,7 @@ async function loadView(view) {
 
 /* ---------- navigation ---------- */
 async function go(view, patch) {
-  if (!state.me && view !== 'login' && view !== 'register' && view !== 'otp') view = 'login';
+  if (!state.me && view !== 'login' && view !== 'register' && view !== 'otp' && view !== 'googleProfile') view = 'login';
   if (state.me && state.me.role !== 'admin' && isAdminView(view)) view = 'dashboard';
   if (patch) Object.assign(state, patch);
   state.view = view;
@@ -136,8 +138,13 @@ let _restoreFocusId = null;
 function render() {
   const app = document.getElementById('app');
   if (state.view === '__setup') { app.innerHTML = viewSetup(); return; }
-  if (state.view === 'login') { app.innerHTML = viewLogin(); return; }
+  if (state.view === 'login') {
+    app.innerHTML = viewLogin();
+    maybeInitGoogle();
+    return;
+  }
   if (state.view === 'register') { app.innerHTML = viewRegister(); restoreFormValues(); return; }
+  if (state.view === 'googleProfile') { app.innerHTML = viewGoogleProfile(); restoreFormValues(); return; }
   if (state.view === 'otp') { app.innerHTML = viewOtp(); return; }
 
   const viewFn = VIEWS[state.view] || VIEWS.dashboard;
@@ -195,6 +202,19 @@ function restoreFormValues() {
     _setFormVal('rg-strand', g.strandSel);
     if (typeof toggleTvSpec === 'function') toggleTvSpec();
     if (g.strandSel === 'TVL/TechPro') _setFormVal('rg-spec', g.spec);
+  }
+  if (state.view === 'googleProfile' && f.gp) {
+    const g = f.gp;
+    _setFormVal('gp-num', g.studentNumber);
+    _setFormVal('gp-first', g.firstName);
+    _setFormVal('gp-last', g.lastName);
+    _setFormVal('gp-middle', g.middleName);
+    _setFormVal('gp-contact', g.contact);
+    _setFormVal('gp-pass', g.password);
+    _setFormVal('gp-grade', g.gradeLevel);
+    _setFormVal('gp-strand', g.strandSel);
+    if (typeof gpToggleSpec === 'function') gpToggleSpec();
+    if (g.strandSel === 'TVL/TechPro') _setFormVal('gp-spec', g.spec);
   }
   if (state.view === 'changePassword' && f.cp) {
     _setFormVal('cp-current', f.cp.currentPassword);
@@ -475,6 +495,124 @@ async function doLogin(e) {
 function toggleTvSpec() {
   const wrap = document.getElementById('rg-spec-wrap');
   if (wrap) wrap.style.display = document.getElementById('rg-strand').value === 'TVL/TechPro' ? '' : 'none';
+}
+
+/* ---------- Google Sign-In (client) ----------
+   The button only appears when the server reports a configured
+   GOOGLE_CLIENT_ID (via GET /api/app/config). */
+let _gisLoading = false;
+function maybeInitGoogle() {
+  const cid = state.appConfig && state.appConfig.googleClientId;
+  if (!cid) return;                     /* not configured → no button */
+  renderGoogleBtn(cid);
+  if (_gisLoading || window.google && window.google.accounts && window.google.accounts.id) return;
+  _gisLoading = true;
+  const s = document.createElement('script');
+  s.src = 'https://accounts.google.com/gsi/client';
+  s.async = true;
+  s.defer = true;
+  s.onload = () => renderGoogleBtn(cid);
+  s.onerror = () => { _gisLoading = false; };
+  document.head.appendChild(s);
+}
+function renderGoogleBtn(cid) {
+  const box = document.getElementById('gbtn');
+  if (!box || !window.google || !google.accounts || !google.accounts.id) return;
+  if (box.dataset.gisReady === cid) return;   /* already drawn for this client */
+  box.innerHTML = '';
+  try {
+    google.accounts.id.initialize({
+      client_id: cid,
+      callback: onGoogleCredential,
+      auto_select: false,
+      cancel_on_tap_outside: true
+    });
+    google.accounts.id.renderButton(box, {
+      theme: isDark() ? 'filled_black' : 'outline',
+      size: 'large',
+      width: 320,
+      text: 'continue_with',
+      shape: 'rectangular'
+    });
+    box.dataset.gisReady = cid;
+  } catch (e) { console.error('Google button', e); }
+}
+
+/* Step 1 response from Google → send the ID token to our server */
+async function onGoogleCredential(credential) {
+  try {
+    const data = await Api.post('/api/auth/google', { idToken: credential });
+    if (data.needsProfile) {
+      /* brand-new Google user → must fill up a profile first */
+      const p = data.profile || {};
+      const parts = String(p.name || '').trim().split(/\s+/);
+      state.gp = {
+        tempToken: data.tempToken,
+        email: p.email || '',
+        name: p.name || '',
+        picture: p.picture || '',
+        firstName: parts.length > 1 ? parts[0] : '',
+        lastName: parts.length > 1 ? parts.slice(1).join(' ') : '',
+        middleName: ''
+      };
+      state.error = '';
+      go('googleProfile');
+      return;
+    }
+    Api.saveSession(data.token, data.user);
+    state.me = await Api.get('/api/auth/me');
+    toast('Welcome, ' + data.user.name + '!');
+    await go(data.user.role === 'admin' ? 'adminDashboard' : 'dashboard');
+  } catch (err) {
+    state.error = err.message;
+    render();
+  }
+}
+
+function gpToggleSpec() {
+  const wrap = document.getElementById('gp-spec-wrap');
+  if (wrap) wrap.style.display = document.getElementById('gp-strand').value === 'TVL/TechPro' ? '' : 'none';
+}
+
+/* Step 2: new Google user submits their profile → account created + logged in */
+async function doGoogleProfile(e) {
+  e.preventDefault();
+  state.error = '';
+  const strandSel = document.getElementById('gp-strand').value;
+  const specEl = document.getElementById('gp-spec');
+  const body = {
+    tempToken: state.gp && state.gp.tempToken,
+    studentNumber: document.getElementById('gp-num').value.trim(),
+    firstName: document.getElementById('gp-first').value.trim(),
+    lastName: document.getElementById('gp-last').value.trim(),
+    middleName: document.getElementById('gp-middle').value.trim(),
+    gradeLevel: document.getElementById('gp-grade').value,
+    strand: (strandSel === 'TVL/TechPro' && specEl) ? 'TVL/TechPro - ' + specEl.value : strandSel,
+    contact: document.getElementById('gp-contact').value.trim(),
+    password: document.getElementById('gp-pass').value
+  };
+  const weak = passwordIssue(body.password);
+  /* stash what was typed so an error re-render doesn't wipe the form */
+  const stash = {
+    studentNumber: body.studentNumber, firstName: body.firstName, lastName: body.lastName,
+    middleName: body.middleName, gradeLevel: body.gradeLevel, strandSel: strandSel,
+    spec: (specEl ? specEl.value : ''), contact: body.contact, password: body.password
+  };
+  const keepGp = () => { state.form = state.form || {}; state.form.gp = stash; };
+  if (weak) { keepGp(); state.error = weak; return render(); }
+  try {
+    const data = await Api.post('/api/auth/google/complete', body);
+    delete state.form.gp;
+    state.gp = null;
+    Api.saveSession(data.token, data.user);
+    state.me = await Api.get('/api/auth/me');
+    toast('Welcome to Smart Registrar, ' + data.user.name + '!');
+    await go('dashboard');
+  } catch (err) {
+    keepGp();
+    state.error = err.message;
+    render();
+  }
 }
 
 async function doRegister(e) {
@@ -1250,6 +1388,8 @@ async function boot() {
     document.getElementById('app').innerHTML = viewSetup();
     return;
   }
+  /* public config (Google client id, etc.) — non-fatal if it fails */
+  try { state.appConfig = await Api.get('/api/app/config'); } catch (e) { state.appConfig = null; }
   if (Api.token) {
     try {
       state.me = await Api.get('/api/auth/me');

@@ -3,9 +3,12 @@
 ===================================================== */
 const express = require('express');
 const crypto = require('crypto');
+const jwt = require('jsonwebtoken');
+const config = require('../config');
 const { q, logActivity } = require('../db');
 const { hashPassword, verifyPassword, signToken, requireAuth, validateBody } = require('../auth');
 const { sendOtpMail, isConfigured } = require('../mailer');
+const { verifyIdToken } = require('../google');
 
 const router = express.Router();
 
@@ -183,6 +186,93 @@ router.post('/register/verify-otp', (req, res) => {
   );
   logActivity(Number(r2.lastInsertRowid), p.firstName + ' ' + p.lastName, 'REGISTER', email + ' (OTP verified)');
   res.status(201).json({ message: 'Account created. You can now log in.' });
+});
+
+/* ============================================================
+   GOOGLE SIGN-IN
+   Step 1: POST /api/auth/google          → login, or a temp
+           token when the Google user is brand new
+   Step 2: POST /api/auth/google/complete → new users finish
+           their profile (LRN, grade, strand, password)
+============================================================ */
+
+/* Step 1: verify the Google ID token (RS256, our client ID) */
+router.post('/google', async (req, res) => {
+  let g;
+  try {
+    g = await verifyIdToken((req.body || {}).idToken);
+  } catch (e) {
+    return res.status(401).json({ error: 'Google sign-in failed: ' + e.message });
+  }
+  let user = q.get('SELECT * FROM users WHERE google_sub = ?', g.sub);
+  if (!user) {
+    user = q.get('SELECT * FROM users WHERE email = ?', g.email);
+    if (user) {
+      /* the Google-verified email matches an existing account — link it */
+      q.run('UPDATE users SET google_sub=? WHERE id=?', g.sub, user.id);
+      user.google_sub = g.sub;
+    }
+  }
+  if (user) {
+    if (user.status && user.status !== 'active') {
+      return res.status(403).json({ error: 'This account has been disabled. Contact the registrar.' });
+    }
+    logActivity(user.id, user.name, 'LOGIN_GOOGLE', user.email);
+    return res.json({
+      token: signToken(user),
+      user: { id: user.id, name: user.name, email: user.email, role: user.role, studentId: user.student_id }
+    });
+  }
+  /* brand-new Google user — the app must collect their profile first */
+  const tempToken = jwt.sign(
+    { purpose: 'google_profile', sub: g.sub, email: g.email, name: g.name, picture: g.picture },
+    config.JWT_SECRET, { expiresIn: '15m' }
+  );
+  res.json({ needsProfile: true, tempToken, profile: { email: g.email, name: g.name, picture: g.picture } });
+});
+
+/* Step 2: brand-new user completes their profile → account + session */
+router.post('/google/complete', (req, res) => {
+  const b = req.body || {};
+  if (!validateBody(res, b, ['tempToken', 'studentNumber', 'firstName', 'lastName', 'gradeLevel', 'strand', 'password'])) return;
+  let p;
+  try {
+    p = jwt.verify(String(b.tempToken), config.JWT_SECRET);
+    if (p.purpose !== 'google_profile') throw new Error('bad purpose');
+  } catch (e) {
+    return res.status(401).json({ error: 'Your Google sign-in expired. Please sign in again.' });
+  }
+  const email = String(p.email).toLowerCase();
+  if (q.get('SELECT id FROM users WHERE email = ?', email)) {
+    return res.status(409).json({ error: 'This email already has an account — please sign in normally.' });
+  }
+  const lrn = String(b.studentNumber).trim();
+  if (q.get('SELECT id FROM students WHERE student_number = ?', lrn)) {
+    return res.status(409).json({ error: 'This LRN is already registered' });
+  }
+  const weak = passwordIssue(b.password);
+  if (weak) return res.status(400).json({ error: weak });
+
+  const first = String(b.firstName).trim();
+  const last = String(b.lastName).trim();
+  const r1 = q.run(
+    'INSERT INTO students (student_number, first_name, middle_name, last_name, grade_level, strand, contact, email) VALUES (?,?,?,?,?,?,?,?)',
+    lrn, first, String(b.middleName || '').trim(), last, String(b.gradeLevel).trim(),
+    String(b.strand).trim(), String(b.contact || '').trim(), email
+  );
+  const studentId = Number(r1.lastInsertRowid);
+  const name = (first + ' ' + last).trim();
+  const r2 = q.run(
+    'INSERT INTO users (student_id, name, email, password_hash, role, google_sub) VALUES (?,?,?,?,?,?)',
+    studentId, name, email, hashPassword(b.password), 'student', p.sub
+  );
+  const uid = Number(r2.lastInsertRowid);
+  const row = q.get('SELECT * FROM users WHERE id=?', uid);
+  logActivity(uid, name, 'REGISTER', email + ' (Google sign-in)');
+  res.status(201).json({
+    token: signToken(row),
+    user: { id: uid, name, email, role: 'student', studentId }
+  });
 });
 
 /* ============================================================

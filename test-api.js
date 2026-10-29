@@ -362,10 +362,23 @@ async function call(method, path, token, body) {
   r = await call('GET', '/api/nope', admin);
   assert(r.status === 404, 'unknown API route → JSON 404');
 
-  /* --- app version (update notifier, public — no token) --- */
+  /* --- app version (update notifier, public - no token) --- */
   r = await call('GET', '/api/app/version');
   assert(r.status === 200 && typeof r.data.version === 'string' && r.data.version.length > 0 &&
     r.data.updated_at, 'app version endpoint (public)');
+
+  /* --- app config (public - safe values only, used for Google button) --- */
+  r = await call('GET', '/api/app/config');
+  assert(r.status === 200 && typeof r.data.googleClientId === 'string', 'app config exposes googleClientId (public)');
+
+  /* --- google sign-in: garbage tokens are rejected, no partial accounts --- */
+  r = await call('POST', '/api/auth/google', null, { idToken: 'garbage.token.here' });
+  assert(r.status === 401 && r.data.error, 'google sign-in rejects a malformed/garbage ID token');
+  r = await call('POST', '/api/auth/google/complete', null, {
+    tempToken: 'garbage', studentNumber: '999999999999', firstName: 'X', lastName: 'Y',
+    gradeLevel: '11', strand: 'STEM', password: 'Passw0rd123'
+  });
+  assert(r.status === 401 && r.data.error, 'google profile completion rejects an expired/temp garbage token');
 
   /* --- frontend served --- */
   const home = await fetch(BASE + '/');

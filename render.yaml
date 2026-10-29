@@ -22,6 +22,12 @@ services:
         value: 0.0.0.0
       - key: DB_PATH
         value: ./database/smart-registrar.db
+      # Google Sign-In — paste your Web client ID here (leave empty to hide
+      # the button). Get one from: Google Cloud Console → Credentials →
+      # OAuth client ID (Web application), origins:
+      #   https://smart-registrar.onrender.com  and  http://localhost:3000
+      - key: GOOGLE_CLIENT_ID
+        value: ''
       # Persistence — automatic DB snapshot backup/restore (Supabase).
       # Lets records survive Render redeploys (ephemeral disk).
       - key: SUPABASE_URL

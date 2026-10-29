@@ -30,6 +30,8 @@ function viewLogin() {
         </div>
         <button class="btn btn-primary btn-block" type="submit">Sign in</button>
       </form>
+      <div class="auth-divider"><span>or continue with</span></div>
+      <div class="gbtn-wrap" id="gbtn"></div>
       <div class="auth-switch">
         New student? <a onclick="go('register')">Create an account</a>
       </div>
@@ -107,6 +109,82 @@ function viewRegister() {
         <button class="btn btn-primary btn-block" type="submit">Create account</button>
       </form>
       <div class="auth-switch">Already registered? <a onclick="go('login')">Sign in</a></div>
+    </div>
+  </div>`;
+}
+
+/* ---------------- GOOGLE PROFILE (new Google user fills this up first) ------- */
+function viewGoogleProfile() {
+  const g = state.gp || {};
+  return `
+  <div class="auth-page">
+    <div class="auth-card">
+      <div class="auth-brand">
+        <div class="auth-badge logo-badge"><img src="assets/logo.jpg" alt="CDLSHS logo"></div>
+        <h1>Complete your profile</h1>
+        <p>One quick step before you enter the app</p>
+      </div>
+      <div class="gp-google-chip">
+        ${g.picture ? `<img src="${esc(g.picture)}" alt="" referrerpolicy="no-referrer">` : `<span class="gp-chip-ic">👤</span>`}
+        <span><b>${esc(g.name || 'Google user')}</b><small>${esc(g.email || '')}</small></span>
+      </div>
+      ${state.error ? `<div class="form-error">${esc(state.error)}</div>` : ''}
+      <form onsubmit="doGoogleProfile(event)">
+        <div class="field"><label>LRN</label>
+          <input class="input" id="gp-num" placeholder="12-digit Learner Reference Number" required></div>
+        <div class="form-row">
+          <div class="field"><label>First Name</label>
+            <input class="input" id="gp-first" value="${esc(g.firstName || '')}" required></div>
+          <div class="field"><label>Last Name</label>
+            <input class="input" id="gp-last" value="${esc(g.lastName || '')}" required></div>
+        </div>
+        <div class="field"><label>Middle Name <span class="muted small">(optional)</span></label>
+          <input class="input" id="gp-middle" value="${esc(g.middleName || '')}"></div>
+        <div class="form-row">
+          <div class="field"><label>Grade / Year Level</label>
+            <select class="input" id="gp-grade">
+              <option>11</option><option>12</option>
+            </select></div>
+          <div class="field"><label>Strand</label>
+            <select class="input" id="gp-strand" onchange="gpToggleSpec()">
+              <option>STEM</option><option>ABM</option><option>HUMMS</option><option>TVL/TechPro</option>
+            </select></div>
+        </div>
+        <div class="field" id="gp-spec-wrap" style="display:none">
+          <label>TVL/TechPro Track</label>
+          <select class="input" id="gp-spec">
+            <option>Programming</option>
+            <option>Computer System Servicing (CSS)</option>
+            <option>Automotive Servicing (AS)</option>
+            <option>Electrical Installation &amp; Maintenance (EIM)</option>
+            <option>Electronic Products Assembly &amp; Servicing (EPAS)</option>
+            <option>Motorcycle Small Engine Servicing (MSES)</option>
+            <option>Shielded Metal Arc Welding (SMAW)</option>
+            <option>Cookery</option>
+            <option>Food and Beverages Servicing (FBS)</option>
+            <option>Bread and Pastry Production (BPP)</option>
+            <option>Dressmaking</option>
+            <option>Tailoring</option>
+            <option>Caregiving</option>
+            <option>Beauty &amp; Nail Care (BNC)</option>
+            <option>Wellness Massage</option>
+            <option>Housekeeping</option>
+            <option>Front Office Servicing (FOS)</option>
+          </select>
+        </div>
+        <div class="field"><label>Contact Number</label>
+          <input class="input" id="gp-contact" placeholder="09XX XXX XXXX"></div>
+        <div class="field"><label>Password <span class="muted small">(for this app — your Google password is not used here)</span></label>
+          <div class="pass-wrap">
+            <input class="input" id="gp-pass" type="password" minlength="8" placeholder="at least 8 characters + letters &amp; numbers" required>
+            <button type="button" class="pass-eye" onclick="togglePass('gp-pass', this)" title="Show password" aria-label="Show password">👁</button>
+          </div>
+        </div>
+        <button class="btn btn-primary btn-block" type="submit" id="gp-btn">Save &amp; continue</button>
+      </form>
+      <div class="auth-switch small">
+        Wrong Google account? <a onclick="Api.clearSession();state.gp=null;go('login')">Sign in with another</a>
+      </div>
     </div>
   </div>`;
 }

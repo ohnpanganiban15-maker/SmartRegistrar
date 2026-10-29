@@ -76,6 +76,17 @@ const evalA = expr => w.eval(expr);
 
   /* --- boot → login screen --- */
   assert(w.document.getElementById('li-email') !== null, 'app boots to login screen');
+
+  /* --- google sign-in UI (slot rendered always; button hidden until a client ID is set) --- */
+  assert(w.document.getElementById('gbtn') !== null, 'login screen has a Google sign-in slot');
+  assert($app().includes('or continue with'), 'login screen: divider before Google sign-in');
+  await w.eval("go('googleProfile')");
+  await sleep(80);
+  assert(w.document.getElementById('gp-num') !== null && w.document.getElementById('gp-pass') !== null &&
+    w.document.getElementById('gp-strand') !== null,
+    'new Google user must fill up the profile form (LRN, password, strand)');
+  await w.eval("go('login')");
+  await sleep(80);
   assert($app().includes('Appointment'), 'login screen: appointment present in app name');
 
   /* --- fixture students (tests create their own data — no seed examples) --- */
