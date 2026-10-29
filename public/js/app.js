@@ -508,7 +508,7 @@ function maybeInitGoogle() {
   if (_gisLoading || window.google && window.google.accounts && window.google.accounts.id) return;
   _gisLoading = true;
   const s = document.createElement('script');
-  s.src = 'https://accounts.google.com/gsi/client';
+  s.src = 'https://accounts.google.com/gsi/client?hl=en';   /* force English button text */
   s.async = true;
   s.defer = true;
   s.onload = () => renderGoogleBtn(cid);
