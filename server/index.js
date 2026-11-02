@@ -25,7 +25,12 @@ app.use((req, res, next) => {
 app.use((req, res, next) => {
   res.set('X-Content-Type-Options', 'nosniff');
   res.set('X-Frame-Options', 'DENY');
-  res.set('Referrer-Policy', 'same-origin');
+  /* strict-origin-when-cross-origin (not 'same-origin'): the Google Sign-In
+     button loads an iframe from accounts.google.com, which reads the Origin
+     from our Referer header. 'same-origin' stripped it entirely, so Google
+     answered 400 "The given origin is not allowed for the given client ID".
+     This policy still hides full paths cross-origin — it only sends the origin. */
+  res.set('Referrer-Policy', 'strict-origin-when-cross-origin');
   res.set('X-Download-Options', 'noopen');
   res.set('Permissions-Policy', 'camera=(self), microphone=()');
   next();
