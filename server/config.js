@@ -26,7 +26,5 @@ module.exports = {
   PORT: parseInt(process.env.PORT || '3000', 10),
   HOST: process.env.HOST || '0.0.0.0',
   JWT_SECRET: process.env.JWT_SECRET || 'dev-secret-do-not-use-in-production',
-  DB_PATH: process.env.DB_PATH || './database/smart-registrar.db',
-  /* Google Sign-In web client ID (empty = button hidden) */
-  GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID || ''
+  DB_PATH: process.env.DB_PATH || './database/smart-registrar.db'
 };
