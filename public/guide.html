@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Student's Guide — CDLSHS Smart Registrar</title>
+<link rel="icon" type="image/jpeg" href="assets/logo.jpg">
+<style>
+  * { box-sizing:border-box; margin:0; padding:0; }
+  html,body { width:1920px; height:1080px; overflow:hidden; }
+  body {
+    font-family:"Segoe UI",system-ui,-apple-system,Roboto,"Helvetica Neue",Arial,sans-serif;
+    color:#fff; position:relative;
+    background:
+      radial-gradient(1100px 700px at 8% 0%, rgba(64,160,240,.30), transparent 62%),
+      radial-gradient(900px 640px at 96% 108%, rgba(232,161,61,.20), transparent 62%),
+      linear-gradient(135deg,#0E5A96 0%, #0C3F6D 12%, #0A3159 55%, #082544 100%);
+    background-color:#0A3159;
+  }
+  /* faint grid texture */
+  body::before {
+    content:''; position:absolute; inset:0; opacity:.06; pointer-events:none;
+    background-image:linear-gradient(rgba(255,255,255,.7) 1px, transparent 1px),
+                     linear-gradient(90deg, rgba(255,255,255,.7) 1px, transparent 1px);
+    background-size:64px 64px;
+  }
+
+  .page { position:relative; z-index:1; display:flex; flex-direction:column; height:1080px; }
+
+  /* ================= HEADER ================= */
+  .head {
+    display:flex; align-items:center; gap:26px;
+    padding:26px 54px 24px;
+    background:linear-gradient(90deg, rgba(4,26,50,.86), rgba(4,26,50,.30));
+    border-bottom:1px solid rgba(255,255,255,.13);
+  }
+  .head img {
+    width:78px; height:78px; border-radius:50%; object-fit:cover;
+    border:3px solid rgba(255,255,255,.92);
+    box-shadow:0 10px 28px rgba(0,0,0,.42);
+  }
+  .head .eyebrow {
+    font-size:19px; font-weight:800; letter-spacing:4.5px; color:#8FD3FF;
+    text-transform:uppercase; margin-bottom:4px;
+  }
+  .head h1 { font-size:57px; font-weight:900; letter-spacing:-1.2px; line-height:1.04; }
+  .head .sub {
+    margin-left:auto; text-align:right; max-width:520px;
+    font-size:22px; font-weight:800; color:#CFE6FA; line-height:1.35;
+  }
+
+  /* ================= BODY ================= */
+  .body { flex:1; display:flex; gap:40px; padding:30px 54px 24px; min-height:0; }
+
+  /* ---- left: steps ---- */
+  .steps { flex:1.63; display:flex; flex-direction:column; min-width:0; }
+  .kicker {
+    font-size:27px; font-weight:900; letter-spacing:5px; color:#9BDAFF;
+    text-transform:uppercase; margin-bottom:16px;
+  }
+  .grid {
+    display:grid; grid-template-columns:1fr 1fr; gap:20px 22px;
+    flex:1; grid-auto-rows:1fr;
+  }
+  .card {
+    background:#fff; color:#0E1B2C; border-radius:17px;
+    padding:18px 22px; display:flex; gap:15px; align-items:center;
+    box-shadow:0 16px 34px -16px rgba(0,0,0,.55);
+    border-top:4px solid #1B6FB0;
+  }
+  .card.tall { grid-row:span 1; }
+  .num {
+    flex:0 0 auto; width:42px; height:42px; border-radius:50%;
+    background:linear-gradient(135deg,#2A7EC0,#0F4C81);
+    color:#fff; display:flex; align-items:center; justify-content:center;
+    font-size:21px; font-weight:900; box-shadow:0 6px 14px -5px rgba(15,76,129,.7);
+  }
+  .txt b {
+    display:block; font-size:24px; font-weight:900; color:#0B3A66;
+    letter-spacing:-.3px; margin-bottom:3px;
+  }
+  .txt span { font-size:17.5px; line-height:1.42; color:#3D5470; display:block; }
+  .txt em { font-style:normal; font-weight:800; color:#0F4C81; }
+  .txt .code {
+    display:inline;
+    font-family:ui-monospace,"Cascadia Mono",Consolas,monospace;
+    font-weight:800; font-size:16.5px; color:#0A3A63; background:#E7F1FA;
+    border:1px solid #C9DFF3; border-radius:6px; padding:1px 6px;
+    white-space:nowrap;
+  }
+
+  .goodtoknow {
+    margin-top:auto; display:flex; gap:14px; align-items:flex-start;
+    background:rgba(255,255,255,.10); border:1px solid rgba(255,255,255,.24);
+    border-left:6px solid #E8A13D; border-radius:15px; padding:15px 22px;
+    backdrop-filter:blur(6px);
+  }
+  .goodtoknow b { color:#FFD79A; font-size:19px; font-weight:900; }
+  .goodtoknow p { font-size:18.5px; line-height:1.46; color:#DCEBF9; }
+  .goodtoknow p em { font-style:normal; font-weight:800; color:#fff; }
+
+  /* ---- right: QR ---- */
+  .qrside {
+    flex:1; display:flex; flex-direction:column; align-items:center;
+    justify-content:flex-start; text-align:center; min-width:0;
+    padding-top:4px;
+  }
+  .qrside h2 {
+    font-size:62px; font-weight:900; letter-spacing:-1.5px; line-height:1.02;
+    text-transform:uppercase;
+  }
+  .qrside .hint { font-size:21px; color:#CFE6FA; font-weight:700; margin-top:10px; }
+  .qr-frame {
+    background:#fff; border-radius:26px; padding:22px; margin-top:20px;
+    box-shadow:0 26px 60px -24px rgba(0,0,0,.7), inset 0 1px 0 #fff;
+    line-height:0;
+  }
+  #qr canvas, #qr img { border-radius:8px; }
+  .urlpill {
+    margin-top:18px; padding:11px 24px; border-radius:14px;
+    background:rgba(255,255,255,.13); border:1.5px solid rgba(255,255,255,.34);
+    font-size:19px; font-weight:800; color:#EAF4FD; max-width:100%;
+    word-break:break-all; line-height:1.35;
+  }
+  .meta { margin-top:13px; font-size:18.5px; color:#CFE6FA; font-weight:700; }
+  .meta b { color:#FFD79A; font-weight:900; }
+  .inst { margin-top:6px; font-size:17.5px; color:#B9D6EE; font-weight:600; }
+
+  /* ================= FOOTER ================= */
+  .foot {
+    background:rgba(3,20,40,.82); border-top:1px solid rgba(255,255,255,.13);
+    padding:15px 54px; display:flex; gap:34px; justify-content:center;
+    align-items:center; font-size:19px; font-weight:800; color:#DCEBF9;
+  }
+  .foot .dot { color:#E8A13D; }
+  .foot span b { color:#8FD3FF; font-weight:900; }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- ================= HEADER ================= -->
+  <header class="head">
+    <img src="assets/logo.jpg" alt="CDLSHS logo">
+    <div>
+      <div class="eyebrow">CDLSHS &middot; Smart Registrar</div>
+      <h1>Student's Guide &mdash; How to Use the App</h1>
+    </div>
+    <div class="sub">Appointments &amp; Document Requests<br>&mdash; step by step</div>
+  </header>
+
+  <!-- ================= BODY ================= -->
+  <main class="body">
+
+    <!-- ---------- LEFT: 7 STEPS ---------- -->
+    <section class="steps">
+      <div class="kicker">7 Steps</div>
+      <div class="grid">
+
+        <div class="card">
+          <div class="num">1</div>
+          <div class="txt">
+            <b>Create Account</b>
+            <span>LRN, name, Gmail, grade &amp; strand &rarr; <em>8+ char password</em> &rarr;
+            <em>6-digit OTP</em> &middot; <em>1 Gmail = 1 account</em></span>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="num">2</div>
+          <div class="txt">
+            <b>Log In</b>
+            <span>Gmail + password &rarr; student dashboard opens &mdash;
+            i-check ang profile at LRN bago mag-book.</span>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="num">3</div>
+          <div class="txt">
+            <b>Book an Appointment</b>
+            <span>Schedule &rarr; <em>service, date, time slot</em> &rarr; purpose &rarr;
+            <em>Confirm</em> &rarr; appointment QR <span class="code">APT-xxxx</span></span>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="num">4</div>
+          <div class="txt">
+            <b>Request a Document</b>
+            <span>Requests &rarr; <em>+ New Request</em> &rarr; type, qty, purpose &rarr;
+            <em>confirm summary</em> &rarr; request QR + <span class="code">REQ-xxxx</span></span>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="num">5</div>
+          <div class="txt">
+            <b>Track Your Requests</b>
+            <span>My Requests: <em>Pending &rarr; Processing &rarr; Ready for Pickup &rarr; Completed</em>
+            &middot; <em>Show QR</em> sa counter</span>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="num">6</div>
+          <div class="txt">
+            <b>Check Notifications</b>
+            <span>Tap the <em>bell icon</em> &mdash; approved? rejected? document ready?
+            <em>Alerted instantly</em> in-app.</span>
+          </div>
+        </div>
+
+        <div class="card" style="grid-column:1 / -1">
+          <div class="num">7</div>
+          <div class="txt">
+            <b>Profile &amp; My QR</b>
+            <span><em>Profile</em> &rarr; LRN + profile picture &middot;
+            <em>My QR</em> <span class="code">STU-xxxx</span> for identification &middot;
+            change password anytime <em>(OTP)</em></span>
+          </div>
+        </div>
+
+      </div>
+
+      <div class="goodtoknow">
+        <div>
+          <b>Good to know:</b>
+          <p>Registrar's slots lang ang bookable &middot; <em>1 slot = 1 student</em> &middot;
+             APT = appointment, REQ = document &middot; slow first load?
+             <em>Server is waking up</em> &mdash; wait, then refresh.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ---------- RIGHT: QR ---------- -->
+    <aside class="qrside">
+      <h2>Scan to<br>Download</h2>
+      <div class="hint">I-scan gamit ang camera ng phone</div>
+
+      <div class="qr-frame"><div id="qr"></div></div>
+
+      <div class="urlpill">smart-registrar.onrender.com/<br>downloads/SmartRegistrar.apk</div>
+
+      <div class="meta">Android APK &middot; <b>~11 MB</b> &middot; <b>Free</b></div>
+      <div class="inst">I-open ang link &rarr; <b>Install</b> (Allow from unknown sources)</div>
+    </aside>
+
+  </main>
+
+  <!-- ================= FOOTER ================= -->
+  <footer class="foot">
+    <span class="dot">&bull;</span>
+    <span><b>smart-registrar.onrender.com</b></span>
+    <span class="dot">&bull;</span>
+    <span>APK: <b>/downloads/SmartRegistrar.apk</b></span>
+    <span class="dot">&bull;</span>
+    <span><b>Admin &amp; school info are notified instantly</b></span>
+  </footer>
+
+</div>
+
+<script src="js/vendor/qrcode.min.js"></script>
+<script>
+  (function () {
+    var APK = 'https://smart-registrar.onrender.com/downloads/SmartRegistrar.apk';
+    try {
+      new QRCode(document.getElementById('qr'), {
+        text: APK, width: 330, height: 330,
+        colorDark: '#0E1B2C', colorLight: '#ffffff',
+        correctLevel: QRCode.CorrectLevel.M
+      });
+    } catch (e) {}
+    document.documentElement.setAttribute('data-ready', '1');
+  })();
+</script>
+</body>
+</html>
