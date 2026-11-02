@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#0F4C81">
+<title>Download the App — CDLSHS Smart Registrar</title>
+<link rel="icon" type="image/jpeg" href="assets/logo.jpg">
+<style>
+  :root {
+    --bg:#EDF2F9; --surface:#FFFFFF; --surface-2:#F3F7FC;
+    --text:#0E1B2C; --muted:#5A6B80; --border:#DDE7F2;
+    --primary:#0F4C81; --primary-bright:#1B6FB0; --primary-deep:#0A3A63;
+    --accent:#E8A13D; --accent-deep:#C97F1E;
+    --grad:linear-gradient(135deg,#2A7EC0 0%,#0F4C81 52%,#0A3559 100%);
+    --shadow:0 24px 56px -26px rgba(12,40,70,.34);
+    --font:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body {
+    font-family:var(--font); color:var(--text); background:var(--bg);
+    min-height:100vh; line-height:1.6; -webkit-font-smoothing:antialiased;
+    padding:26px 16px 48px;
+  }
+  /* soft drifting orbs (same realistic look as the app) */
+  body::before, body::after {
+    content:''; position:fixed; z-index:0; border-radius:50%;
+    filter:blur(90px); pointer-events:none;
+  }
+  body::before { width:520px; height:520px; top:-170px; right:-130px;
+    background:radial-gradient(circle,rgba(43,126,192,.34),transparent 65%); }
+  body::after { width:460px; height:460px; bottom:-170px; left:-130px;
+    background:radial-gradient(circle,rgba(232,161,61,.26),transparent 65%); }
+
+  .wrap { position:relative; z-index:1; max-width:760px; margin:0 auto; }
+
+  /* ---------- header ---------- */
+  .hero {
+    background:var(--grad); color:#fff; border-radius:26px;
+    padding:28px 26px; text-align:center; position:relative; overflow:hidden;
+    box-shadow:var(--shadow), inset 0 1px 0 rgba(255,255,255,.26);
+  }
+  .hero::after {
+    content:''; position:absolute; inset:0;
+    background:
+      radial-gradient(600px 180px at 20% -30%, rgba(255,255,255,.22), transparent),
+      radial-gradient(500px 200px at 90% 130%, rgba(232,161,61,.32), transparent);
+    pointer-events:none;
+  }
+  .hero img.logo {
+    width:74px; height:74px; border-radius:50%; object-fit:cover;
+    border:3px solid rgba(255,255,255,.85);
+    box-shadow:0 12px 30px rgba(0,0,0,.34); position:relative; z-index:1;
+  }
+  .hero h1 { font-size:25px; letter-spacing:-.4px; margin-top:12px; position:relative; z-index:1; }
+  .hero p { font-size:14px; opacity:.9; position:relative; z-index:1; }
+  .hero .pill {
+    display:inline-flex; align-items:center; gap:7px; position:relative; z-index:1;
+    margin-top:14px; padding:6px 14px; border-radius:999px;
+    background:rgba(255,255,255,.16); border:1px solid rgba(255,255,255,.3);
+    font-size:12.5px; font-weight:700; letter-spacing:.3px;
+    backdrop-filter:blur(8px); -webkit-backdrop-filter:blur(8px);
+  }
+  .pill .dot { width:7px; height:7px; border-radius:50%; background:#7CE0A6;
+    box-shadow:0 0 0 3px rgba(124,224,166,.28); }
+
+  /* ---------- card ---------- */
+  .card {
+    background:var(--surface); border:1px solid var(--border); border-radius:26px;
+    padding:30px 26px; margin-top:20px;
+    box-shadow:var(--shadow), inset 0 1px 0 rgba(255,255,255,.7);
+  }
+  .sec-title {
+    display:flex; align-items:center; gap:10px;
+    font-size:12px; font-weight:800; letter-spacing:1.4px; text-transform:uppercase;
+    color:var(--primary); margin-bottom:18px;
+  }
+  .sec-title::after { content:''; flex:1; height:1px;
+    background:linear-gradient(90deg,var(--border),transparent); }
+
+  /* ---------- QR ---------- */
+  .qr-block { text-align:center; }
+  .qr-frame {
+    display:inline-block; padding:16px; background:#fff; border-radius:22px;
+    border:1px solid var(--border);
+    box-shadow:0 18px 40px -20px rgba(12,40,70,.42), inset 0 1px 0 #fff;
+  }
+  #qr { line-height:0; }
+  #qr img, #qr canvas { border-radius:8px; }
+  .qr-cap { margin-top:14px; font-size:16px; font-weight:800; }
+  .qr-url {
+    display:inline-block; margin-top:8px; padding:7px 13px; border-radius:11px;
+    background:var(--surface-2); border:1px dashed var(--border);
+    font-size:12.5px; font-weight:700; color:var(--primary); word-break:break-all;
+    font-family:ui-monospace,"Cascadia Mono",Menlo,Consolas,monospace;
+  }
+
+  .btn-row { display:flex; gap:12px; justify-content:center; flex-wrap:wrap; margin-top:20px; }
+  .btn {
+    display:inline-flex; align-items:center; gap:9px; justify-content:center;
+    padding:14px 26px; border-radius:14px; border:none; cursor:pointer;
+    font-family:inherit; font-size:15px; font-weight:800; text-decoration:none;
+    transition:transform .2s cubic-bezier(.2,.9,.3,1.3), box-shadow .2s;
+  }
+  .btn-primary {
+    color:#fff; background:var(--grad);
+    box-shadow:0 2px 4px rgba(10,53,89,.22), 0 12px 26px -8px rgba(15,76,129,.55),
+               inset 0 1px 0 rgba(255,255,255,.32), inset 0 -2px 4px rgba(10,53,89,.22);
+  }
+  .btn-ghost { color:var(--primary); background:var(--surface-2); border:1px solid var(--border); }
+  .btn:hover { transform:translateY(-2px); }
+  .btn:active { transform:translateY(1px) scale(.985);
+    box-shadow:inset 0 2px 6px rgba(10,40,70,.28); }
+
+  /* ---------- steps ---------- */
+  ol.steps { list-style:none; counter-reset:s; }
+  ol.steps li {
+    counter-increment:s; position:relative; padding:0 0 22px 54px;
+  }
+  ol.steps li:last-child { padding-bottom:4px; }
+  ol.steps li::before {
+    content:counter(s); position:absolute; left:0; top:-2px;
+    width:34px; height:34px; border-radius:50%;
+    background:var(--grad); color:#fff;
+    display:flex; align-items:center; justify-content:center;
+    font-size:14.5px; font-weight:800;
+    box-shadow:0 6px 16px -6px rgba(15,76,129,.6), inset 0 1px 0 rgba(255,255,255,.3);
+  }
+  ol.steps li::after {
+    content:''; position:absolute; left:16.5px; top:36px; bottom:4px; width:2px;
+    background:linear-gradient(180deg,var(--border),transparent);
+  }
+  ol.steps li:last-child::after { display:none; }
+  ol.steps b { display:block; font-size:15.5px; margin-bottom:2px; }
+  ol.steps span { font-size:14.5px; color:var(--muted); display:block; }
+  ol.steps code {
+    background:var(--surface-2); border:1px solid var(--border); border-radius:6px;
+    padding:1px 6px; font-size:13px; font-weight:700; color:var(--primary);
+    font-family:ui-monospace,"Cascadia Mono",Menlo,Consolas,monospace;
+  }
+  ol.steps .hl {
+    background:#FFF5E3; border:1px solid #F5E0B8; border-radius:8px;
+    padding:2px 8px; font-weight:800; color:var(--accent-deep); font-size:13.5px;
+  }
+
+  /* ---------- notes ---------- */
+  .note {
+    display:flex; gap:11px; align-items:flex-start; margin-top:16px;
+    background:var(--surface-2); border:1px solid var(--border);
+    border-left:4px solid var(--accent); border-radius:14px; padding:13px 15px;
+    font-size:13.5px; color:var(--muted);
+  }
+  .note b { color:var(--text); }
+  .note .ic { font-size:17px; line-height:1.4; }
+
+  .specs {
+    display:flex; gap:10px; flex-wrap:wrap; justify-content:center; margin-top:4px;
+  }
+  .spec {
+    background:var(--surface-2); border:1px solid var(--border); border-radius:12px;
+    padding:9px 15px; text-align:center; min-width:110px;
+  }
+  .spec b { display:block; font-size:15px; color:var(--primary); }
+  .spec small { font-size:11px; color:var(--muted); text-transform:uppercase;
+    letter-spacing:.7px; font-weight:700; }
+
+  footer {
+    text-align:center; margin-top:22px; color:var(--muted); font-size:12.5px;
+  }
+  footer a { color:var(--primary); font-weight:700; }
+
+  .toolbar { display:flex; gap:10px; justify-content:center; margin-top:16px; }
+  .toolbar button {
+    font-family:inherit; font-size:12.5px; font-weight:700; cursor:pointer;
+    padding:8px 16px; border-radius:11px; border:1px solid var(--border);
+    background:var(--surface); color:var(--muted);
+    transition:.18s;
+  }
+  .toolbar button:hover { color:var(--primary); border-color:var(--primary); transform:translateY(-1px); }
+
+  @media (max-width:520px) {
+    body { padding:16px 12px 36px; }
+    .card { padding:24px 18px; border-radius:22px; }
+    .hero { padding:24px 18px; border-radius:22px; }
+    .hero h1 { font-size:21px; }
+    ol.steps li { padding-left:46px; }
+  }
+
+  /* ---------- print (A4 poster) ---------- */
+  @media print {
+    @page { size:A4; margin:12mm; }
+    body { background:#fff; padding:0; }
+    body::before, body::after, .toolbar { display:none !important; }
+    .card, .hero { box-shadow:none; break-inside:avoid; }
+    .card { margin-top:14px; padding:22px; }
+    a { text-decoration:none; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="hero">
+    <img class="logo" src="assets/logo.jpg" alt="CDLSHS logo">
+    <h1>Download the Smart Registrar App</h1>
+    <p>CDLSHS — Appointment &amp; Document Request System</p>
+    <div class="pill"><span class="dot"></span> Android APK &middot; Free download</div>
+  </div>
+
+  <!-- ================= QR ================= -->
+  <div class="card qr-block">
+    <div class="sec-title">Step 1 &mdash; Scan to download</div>
+
+    <div class="qr-frame"><div id="qr"></div></div>
+
+    <div class="qr-cap">Scan with your phone camera</div>
+    <div class="qr-url">https://smart-registrar.onrender.com/downloads/SmartRegistrar.apk</div>
+
+    <div class="btn-row">
+      <a class="btn btn-primary" href="/downloads/SmartRegistrar.apk" download>
+        ⬇ Download the APK
+      </a>
+      <button class="btn btn-ghost" type="button" onclick="window.print()">🖨 Print this page</button>
+    </div>
+
+    <div class="specs" style="margin-top:20px">
+      <div class="spec"><b id="ver">&mdash;</b><small>Version</small></div>
+      <div class="spec"><b>Android</b><small>Platform</small></div>
+      <div class="spec"><b>Free</b><small>Price</small></div>
+    </div>
+  </div>
+
+  <!-- ================= STEPS ================= -->
+  <div class="card">
+    <div class="sec-title">Step 2 &mdash; Install it in 6 easy steps</div>
+
+    <ol class="steps">
+      <li>
+        <b>Scan the QR code above</b>
+        <span>Open your phone's <b>Camera</b> app and point it at the code. A download link will appear &mdash; tap it.</span>
+      </li>
+      <li>
+        <b>Allow the download</b>
+        <span>Chrome may warn you with <span class="hl">"File might be harmful"</span>. This is normal for any app installed outside the Play Store &mdash; tap <b>Download anyway</b>.</span>
+      </li>
+      <li>
+        <b>Open the downloaded file</b>
+        <span>Tap the download notification, or go to <code>Files &rarr; Downloads</code> and tap <code>SmartRegistrar.apk</code>.</span>
+      </li>
+      <li>
+        <b>Allow installation from this source</b>
+        <span>If Android says <span class="hl">"For your security, your phone isn't allowed to install unknown apps"</span>, tap <b>Settings</b>, turn on <b>Allow from this source</b>, then go back.</span>
+      </li>
+      <li>
+        <b>Tap Install</b>
+        <span>Wait a few seconds for it to finish, then tap <b>Open</b>.</span>
+      </li>
+      <li>
+        <b>Sign in and you're in!</b>
+        <span>Use your email and password, or tap <b>Continue with Google</b> for one-tap access.</span>
+      </li>
+    </ol>
+
+    <div class="note">
+      <span class="ic">&#128736;</span>
+      <div>
+        <b>iPhone / iPad users:</b> this is an Android APK. You can still use every feature
+        straight from your browser &mdash; just visit
+        <a href="/">smart-registrar.onrender.com</a> and add it to your Home Screen.
+      </div>
+    </div>
+
+    <div class="note" style="border-left-color:var(--primary)">
+      <span class="ic">&#128274;</span>
+      <div>
+        <b>Safe &amp; official:</b> this download comes straight from the school's own server.
+        The app never asks for your Google password &mdash; sign-in is verified by Google itself.
+      </div>
+    </div>
+  </div>
+
+  <footer>
+    CDLSHS Smart Registrar &middot; Need help? Ask the registrar's office.
+    <br>
+    <a href="/">Back to the web app</a>
+  </footer>
+
+  <div class="toolbar">
+    <button type="button" onclick="window.print()">Print / Save as PDF</button>
+  </div>
+
+</div>
+
+<!-- offline QR library (no internet needed) -->
+<script src="js/vendor/qrcode.min.js"></script>
+<script>
+  (function () {
+    var APK = 'https://smart-registrar.onrender.com/downloads/SmartRegistrar.apk';
+    var box = document.getElementById('qr');
+    try {
+      new QRCode(box, {
+        text: APK,
+        width: 236, height: 236,
+        colorDark: '#0E1B2C', colorLight: '#ffffff',
+        correctLevel: QRCode.CorrectLevel.M
+      });
+    } catch (e) {
+      box.innerHTML = '<div style="font:700 14px monospace;padding:16px;word-break:break-all">' + APK + '</div>';
+    }
+
+    /* live version badge from the app */
+    fetch('/api/app/version').then(function (r) { return r.json(); }).then(function (v) {
+      if (v && v.version) document.getElementById('ver').textContent = v.version;
+    }).catch(function () {});
+  })();
+</script>
+</body>
+</html>

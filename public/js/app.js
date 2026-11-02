@@ -289,6 +289,7 @@ function adminShell(content) {
             ${v === 'adminService' ? `<span class="side-badge" data-count="chats"${openChats ? '' : ' style="display:none"'}>${openChats > 9 ? '9+' : openChats}</span>` : ''}
             ${v === 'adminRequests' ? `<span class="side-badge" data-count="pending"${state.pendingReq ? '' : ' style="display:none"'}>${state.pendingReq > 9 ? '9+' : state.pendingReq}</span>` : ''}
           </button>`).join('')}
+        <button class="side-item" onclick="window.open('/download.html','_blank','noopener')"><span class="ic">⬇</span>Download App</button>
         <button class="side-item" onclick="askLogout()"><span class="ic">↩</span>Log out</button>
       </div>
       <div class="side-foot">Smart Registrar v1.0 · LAN mode</div>
