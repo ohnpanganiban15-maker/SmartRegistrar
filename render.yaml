@@ -22,10 +22,6 @@ services:
         value: 0.0.0.0
       - key: DB_PATH
         value: ./database/smart-registrar.db
-      # TEMPORARY: one-time admin password reset (runs after the DB restore).
-      # Remove this key once the reset has been verified.
-      - key: RESET_ADMIN_PASSWORD
-        value: admin123
       # Persistence — automatic DB snapshot backup/restore (Supabase).
       # Lets records survive Render redeploys (ephemeral disk).
       - key: SUPABASE_URL
