@@ -71,7 +71,14 @@ app.use((err, req, res, next) => {
    After the restore settles, announceIfChanged() posts an announcement
    whenever this boot runs a different build than the last one. */
 const { announceIfChanged } = require('./version');
-try { require('./persistence').init(announceIfChanged); } catch (e) { console.error('[persistence]', e.message); announceIfChanged(); }
+const { resetAdminIfRequested } = require('./reset-admin');
+/* onReady fires AFTER the cloud restore settles — that is the only safe
+   moment to reset the admin password (a restore would otherwise wipe it). */
+function onReady() {
+  try { resetAdminIfRequested(); } catch (e) { console.error('[reset-admin]', e.message); }
+  try { announceIfChanged(); } catch (e) { console.error('[version]', e.message); }
+}
+try { require('./persistence').init(onReady); } catch (e) { console.error('[persistence]', e.message); onReady(); }
 seed(); /* sample data only created when the DB is empty */
 
 app.listen(config.PORT, config.HOST, () => {
