@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>System Flowchart — CDLSHS Smart Registrar</title>
+<link rel="icon" type="image/jpeg" href="assets/logo.jpg">
+<style>
+  * { box-sizing:border-box; margin:0; padding:0; }
+  html,body { width:1920px; height:1463px; overflow:hidden; }
+  body {
+    font-family:"Segoe UI",system-ui,-apple-system,Roboto,"Helvetica Neue",Arial,sans-serif;
+    color:#0E1B2C; position:relative;
+    background:
+      radial-gradient(1100px 700px at 6% -5%, rgba(64,160,240,.20), transparent 62%),
+      radial-gradient(900px 640px at 98% 105%, rgba(232,161,61,.16), transparent 62%),
+      #EDF2F9;
+  }
+  body::before {
+    content:''; position:absolute; inset:0; opacity:.5; pointer-events:none;
+    background-image:linear-gradient(rgba(15,76,129,.05) 1px, transparent 1px),
+                     linear-gradient(90deg, rgba(15,76,129,.05) 1px, transparent 1px);
+    background-size:56px 56px;
+  }
+  .page { position:relative; z-index:1; display:flex; flex-direction:column; height:1463px; }
+
+  /* ============ HEADER ============ */
+  .head {
+    display:flex; align-items:center; gap:24px;
+    padding:22px 54px;
+    background:linear-gradient(100deg,#0A3159 0%,#0F4C81 55%,#12588f 100%);
+    color:#fff; border-bottom:5px solid #E8A13D;
+  }
+  .head img { width:70px; height:70px; border-radius:50%; object-fit:cover;
+    border:3px solid rgba(255,255,255,.9); box-shadow:0 8px 22px rgba(0,0,0,.35); }
+  .head .eyebrow { font-size:16px; font-weight:800; letter-spacing:4px; color:#8FD3FF; text-transform:uppercase; }
+  .head h1 { font-size:46px; font-weight:900; letter-spacing:-.8px; line-height:1.06; }
+  .head .sub { margin-left:auto; text-align:right; font-size:19px; font-weight:700; color:#CFE6FA; line-height:1.4; }
+
+  /* ============ BODY ============ */
+  .body { flex:1; display:flex; flex-direction:column; gap:18px; padding:24px 54px 20px; min-height:0; }
+
+  .panel {
+    background:#fff; border:1px solid #DDE7F2; border-radius:22px;
+    padding:20px 26px 22px; box-shadow:0 18px 42px -26px rgba(12,40,70,.40);
+    position:relative; overflow:hidden;
+  }
+  .panel::before { content:''; position:absolute; left:0; top:0; bottom:0; width:6px; background:#0F4C81; }
+  .panel.gold::before { background:#E8A13D; }
+  .panel.green::before { background:#2E7D4F; }
+
+  .p-head { display:flex; align-items:center; gap:13px; margin-bottom:15px; }
+  .p-num {
+    width:34px; height:34px; border-radius:10px; flex:0 0 auto;
+    background:linear-gradient(135deg,#2A7EC0,#0F4C81); color:#fff;
+    display:flex; align-items:center; justify-content:center;
+    font-size:17px; font-weight:900; box-shadow:0 5px 12px -5px rgba(15,76,129,.7);
+  }
+  .panel.gold .p-num { background:linear-gradient(135deg,#F5B94E,#C97F1E); }
+  .panel.green .p-num { background:linear-gradient(135deg,#4EA877,#2E7D4F); }
+  .p-head h2 { font-size:23px; font-weight:900; letter-spacing:-.3px; color:#0B3A66; }
+  .p-head .hint { font-size:15px; font-weight:700; color:#5A6B80; margin-left:2px; }
+
+  /* ============ FLOW ROW ============ */
+  .flow { display:flex; align-items:center; gap:9px; flex-wrap:nowrap; }
+  .flow.wrap { flex-wrap:wrap; row-gap:12px; }
+
+  .node {
+    background:#F7FAFE; border:2px solid #C9DFF3; border-radius:14px;
+    padding:10px 15px; text-align:center; min-width:0;
+    box-shadow:0 4px 12px -8px rgba(12,40,70,.5);
+  }
+  .node b { display:block; font-size:15.5px; font-weight:900; color:#0B3A66; letter-spacing:-.2px; }
+  .node span { display:block; font-size:13.2px; line-height:1.38; color:#4A6076; margin-top:3px; }
+  .node.start { background:linear-gradient(135deg,#0F4C81,#0A3559); border-color:#0A3559; }
+  .node.start b { color:#fff; } .node.start span { color:#BFE0F7; }
+  .node.dec {
+    background:#FFF5E3; border-color:#F0D49A; border-radius:14px;
+    transform:rotate(0deg);
+  }
+  .node.dec b { color:#8A5A0B; }
+  .node.ok { background:#E4F4EB; border-color:#A9DCC1; } .node.ok b { color:#1E5C39; }
+  .node.bad { background:#FBEAE7; border-color:#EFC3B9; } .node.bad b { color:#9A3A28; }
+  .node.dark { background:#0E1B2C; border-color:#0E1B2C; } .node.dark b { color:#FFD79A; } .node.dark span { color:#B9D6EE; }
+
+  .ar { flex:0 0 auto; font-size:22px; font-weight:900; color:#0F4C81; padding:0 1px; }
+  .ar.gold { color:#C97F1E; }
+
+  .lbl { font-size:12px; font-weight:900; color:#5A6B80; text-transform:uppercase; letter-spacing:.8px; }
+
+  /* branch stack */
+  .branch { display:flex; flex-direction:column; gap:9px; flex:0 0 auto; }
+  .branch .row { display:flex; align-items:center; gap:9px; }
+  .hline { flex:1; min-width:30px; border-top:2.5px solid #C4DAEE; }
+  .branch.merge { position:relative; padding-right:3px; }
+  .branch.merge::after {
+    content:''; position:absolute; right:0; top:30px; bottom:34px;
+    width:2.5px; background:#0F4C81; border-radius:2px;
+  }
+  .node .warn {
+    display:block; margin-top:5px; padding-top:5px; border-top:1.5px dashed #EFC3B9;
+    font-size:12.6px; font-weight:800; color:#B04A36;
+  }
+
+  /* ============ STUDENT MODULES ============ */
+  .mods { display:grid; grid-template-columns:repeat(5,1fr); gap:13px; }
+  .mod {
+    background:#F7FAFE; border:2px solid #C9DFF3; border-radius:16px; padding:13px 14px 14px;
+    position:relative; overflow:hidden;
+  }
+  .mod::after { content:''; position:absolute; left:0; right:0; top:0; height:4px; background:#1B6FB0; }
+  .mod .mh { display:flex; align-items:center; gap:8px; margin-bottom:7px; }
+  .mod .ic {
+    width:28px; height:28px; border-radius:9px; flex:0 0 auto; background:#0F4C81; color:#fff;
+    display:flex; align-items:center; justify-content:center; font-size:14px; font-weight:900;
+  }
+  .mod .mh b { font-size:15.5px; font-weight:900; color:#0B3A66; }
+  .mod ol { list-style:none; counter-reset:s; }
+  .mod ol li {
+    counter-increment:s; position:relative; padding-left:20px;
+    font-size:13.4px; line-height:1.42; color:#4A6076; margin-bottom:3px;
+  }
+  .mod ol li::before {
+    content:counter(s); position:absolute; left:0; top:2px;
+    width:14px; height:14px; border-radius:50%; background:#DCE9F6; color:#0F4C81;
+    font-size:9.5px; font-weight:900; display:flex; align-items:center; justify-content:center;
+  }
+  .mod ol li b { color:#0B3A66; font-weight:800; }
+  .code {
+    display:inline-block; font-family:ui-monospace,"Cascadia Mono",Consolas,monospace;
+    font-size:12.4px; font-weight:800; color:#0A3A63; background:#E7F1FA;
+    border:1px solid #C9DFF3; border-radius:5px; padding:0 5px; white-space:nowrap;
+  }
+
+  /* ============ STATUS LIFECYCLE ============ */
+  .life { display:flex; align-items:center; gap:8px; flex-wrap:nowrap; }
+  .st {
+    padding:8px 17px; border-radius:999px; font-size:14.5px; font-weight:900;
+    white-space:nowrap; border:2px solid transparent;
+  }
+  .st.pending { background:#FFF5E3; color:#8A5A0B; border-color:#F0D49A; }
+  .st.proc    { background:#E2EDF8; color:#0F4C81; border-color:#BBD6EF; }
+  .st.ready   { background:#E4F4EB; color:#1E5C39; border-color:#A9DCC1; }
+  .st.done    { background:#2E7D4F; color:#fff; border-color:#2E7D4F; }
+  .st.rej     { background:#FBEAE7; color:#9A3A28; border-color:#EFC3B9; }
+
+  /* ============ ADMIN MODULES ============ */
+  .agrid { display:grid; grid-template-columns:repeat(3,1fr); gap:11px; }
+  .aitem {
+    background:#F7FAFE; border:2px solid #C9DFF3; border-radius:13px;
+    padding:9px 12px; display:flex; align-items:center; gap:9px;
+  }
+  .aitem .ic {
+    width:26px; height:26px; border-radius:8px; flex:0 0 auto; background:#0F4C81; color:#fff;
+    display:flex; align-items:center; justify-content:center; font-size:13px; font-weight:900;
+  }
+  .aitem b { font-size:14.2px; font-weight:800; color:#0B3A66; }
+
+  .split { display:grid; grid-template-columns:1.35fr 1fr; gap:22px; align-items:start; }
+
+  .vflow { display:flex; flex-direction:column; }
+  .vflow .node { text-align:left; padding:9px 15px; }
+  .vd {
+    text-align:center; font-size:18px; font-weight:900; color:#0F4C81;
+    line-height:1.0; padding:3px 0 4px;
+  }
+  .grp {
+    display:flex; align-items:center; gap:10px; margin-top:16px; margin-bottom:9px;
+  }
+  .grp::after { content:''; flex:1; height:2px; background:#E3ECF6; border-radius:2px; }
+
+  .note {
+    background:#FFF5E3; border:2px solid #F0D49A; border-left:6px solid #E8A13D;
+    border-radius:14px; padding:12px 16px; font-size:14px; line-height:1.5; color:#5A4A22;
+  }
+  .note b { color:#8A5A0B; }
+
+  .foot {
+    background:#0A3159; color:#CFE6FA; padding:13px 54px;
+    display:flex; gap:30px; justify-content:center; align-items:center;
+    font-size:16px; font-weight:800; border-top:4px solid #E8A13D;
+  }
+  .foot .dot { color:#E8A13D; }
+  .foot b { color:#8FD3FF; }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- ================= HEADER ================= -->
+  <header class="head">
+    <img src="assets/logo.jpg" alt="CDLSHS logo">
+    <div>
+      <div class="eyebrow">CDLSHS &middot; Smart Registrar</div>
+      <h1>System Flowchart &mdash; How the App Works</h1>
+    </div>
+    <div class="sub">Appointment &amp; Document Request System<br>Student &amp; Registrar Admin flows</div>
+  </header>
+
+  <main class="body">
+
+    <!-- ============ 1. ACCESS ============ -->
+    <section class="panel">
+      <div class="p-head">
+        <div class="p-num">1</div>
+        <h2>Access &amp; Authentication</h2>
+        <div class="hint">— sinong makakapasok at paano</div>
+      </div>
+
+      <div class="flow">
+        <div class="node start"><b>Start</b><span>Open the app<br>(web / APK)</span></div>
+        <div class="ar">&rarr;</div>
+        <div class="node dec"><b>Account<br>exists?</b></div>
+
+        <div class="branch merge">
+          <div class="row">
+            <span class="lbl">No</span>
+            <div class="ar gold">&rarr;</div>
+            <div class="node"><b>Register</b><span>LRN &middot; email &middot; name &middot; grade &amp; strand<br>password <b>8+ chars</b></span></div>
+            <div class="ar gold">&rarr;</div>
+            <div class="node"><b>Email OTP</b><span>6-digit code<br>verify within 10 min</span></div>
+            <div class="ar gold">&rarr;</div>
+            <div class="node ok"><b>Account created</b></div>
+            <div class="ar gold">&rarr;</div>
+            <div class="hline"></div>
+          </div>
+          <div class="row">
+            <span class="lbl">Yes</span>
+            <div class="ar">&rarr;</div>
+            <div class="node"><b>Log in</b><span>email + password</span>
+              <span class="warn">&#10005; 5 wrong tries = locked 15 min</span></div>
+            <div class="ar">&rarr;</div>
+            <div class="hline"></div>
+          </div>
+        </div>
+
+        <div class="ar">&rarr;</div>
+        <div class="node dark"><b>Role check</b><span>student or admin?</span></div>
+        <div class="ar">&rarr;</div>
+        <div class="branch">
+          <div class="row"><span class="lbl">Student</span><div class="ar">&rarr;</div>
+            <div class="node ok"><b>Student Workspace</b><span>section 2</span></div></div>
+          <div class="row"><span class="lbl">Admin</span><div class="ar gold">&rarr;</div>
+            <div class="node dec"><b>Registrar Admin</b><span>section 3</span></div></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 2. STUDENT ============ -->
+    <section class="panel green">
+      <div class="p-head">
+        <div class="p-num">2</div>
+        <h2>Student Workspace</h2>
+        <div class="hint">— 5 tabs sa ibaba ng app</div>
+      </div>
+
+      <div class="mods">
+
+        <div class="mod">
+          <div class="mh"><div class="ic">&#8962;</div><b>Home</b></div>
+          <ol>
+            <li>Dashboard ng <b>requests &amp; appointments</b></li>
+            <li>Stat cards: pending, processing, ready</li>
+            <li>Mga shortcut papuntang ibang tab</li>
+          </ol>
+        </div>
+
+        <div class="mod">
+          <div class="mh"><div class="ic">&#9638;</div><b>Schedule</b></div>
+          <ol>
+            <li>Piliin ang <b>service</b></li>
+            <li>Piliin ang <b>date</b></li>
+            <li>Piliin ang <b>time slot</b> <span class="muted">(1 slot = 1 student)</span></li>
+            <li>Lagyan ng purpose &rarr; <b>Confirm</b></li>
+            <li>Matatanggap ang <span class="code">APT-xxxx</span> + QR</li>
+          </ol>
+        </div>
+
+        <div class="mod">
+          <div class="mh"><div class="ic">&#9636;</div><b>Requests</b></div>
+          <ol>
+            <li>Pindutin ang <b>+ New Request</b></li>
+            <li>Dokumento &middot; dami &middot; purpose</li>
+            <li><b>Kumpirmahin ang summary</b></li>
+            <li>Tatanggap ng <span class="code">REQ-xxxx</span> + QR</li>
+            <li>Sundan ang status (section 4)</li>
+          </ol>
+        </div>
+
+        <div class="mod">
+          <div class="mh"><div class="ic">&#128276;</div><b>Alerts</b></div>
+          <ol>
+            <li>Na-approve / na-reject?</li>
+            <li>Handa na ba ang document?</li>
+            <li><b>Instant in-app notification</b></li>
+          </ol>
+        </div>
+
+        <div class="mod">
+          <div class="mh"><div class="ic">&#9786;</div><b>Profile</b></div>
+          <ol>
+            <li>LRN + profile picture</li>
+            <li><b>My QR</b> &rarr; <span class="code">STU-xxxx</span></li>
+            <li>Palitan ang password (via <b>OTP</b>)</li>
+          </ol>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ============ 3 + 4 ============ -->
+    <div class="split">
+
+      <!-- 3. ADMIN -->
+      <section class="panel gold">
+        <div class="p-head">
+          <div class="p-num">3</div>
+          <h2>Registrar Admin</h2>
+          <div class="hint">— sidebar modules</div>
+        </div>
+
+        <div class="agrid">
+          <div class="aitem"><div class="ic">&#8962;</div><b>Dashboard</b></div>
+          <div class="aitem"><div class="ic">&#128101;</div><b>Students</b></div>
+          <div class="aitem"><div class="ic">&#9636;</div><b>Requests</b></div>
+          <div class="aitem"><div class="ic">&#9716;</div><b>Pickup Schedule</b></div>
+          <div class="aitem"><div class="ic">&#9635;</div><b>QR Scanner</b></div>
+          <div class="aitem"><div class="ic">&#128226;</div><b>Announcements</b></div>
+          <div class="aitem"><div class="ic">&#9993;</div><b>Customer Service</b></div>
+          <div class="aitem"><div class="ic">&#128202;</div><b>Reports</b></div>
+          <div class="aitem"><div class="ic">&#8801;</div><b>Activity Logs</b></div>
+          <div class="aitem" style="background:#FFF5E3;border-color:#F0D49A"><div class="ic" style="background:#C97F1E">&#11015;</div><b style="color:#8A5A0B">Download App</b></div>
+        </div>
+
+        <div class="grp"><span class="lbl">Action flow &mdash; habang may naka-queue</span></div>
+        <div class="flow">
+          <div class="node"><b>Tanggapin</b><span>tingnan ang QR / ref</span></div>
+          <div class="ar">&rarr;</div>
+          <div class="node"><b>I-update ang status</b><span>isang pindot lang</span></div>
+          <div class="ar">&rarr;</div>
+          <div class="node"><b>Chat</b><span>diretso sa estudyante</span></div>
+          <div class="ar">&rarr;</div>
+          <div class="node ok"><b>I-release</b><span>kapag handa na</span></div>
+        </div>
+      </section>
+
+      <!-- 4. AT THE COUNTER -->
+      <section class="panel">
+        <div class="p-head">
+          <div class="p-num">4</div>
+          <h2>At the Counter</h2>
+          <div class="hint">— QR verification</div>
+        </div>
+
+        <div class="vflow">
+          <div class="node"><b>Student shows QR</b><span>My QR o request QR</span></div>
+          <div class="vd">&darr;</div>
+          <div class="node"><b>Admin scans</b><span>QR Scanner tab</span></div>
+          <div class="vd">&darr;</div>
+          <div class="node"><b>Record found</b><span>pangalan + ano ang hinihingi</span></div>
+          <div class="vd">&darr;</div>
+          <div class="node ok"><b>Release document</b></div>
+        </div>
+
+        <div class="note" style="margin-top:14px">
+          <b>Safe:</b> sadyang nakatago ang sensitibong detalye sa QR lookups &mdash; pangalan at
+          dokumento lang ang lumalabas.
+        </div>
+      </section>
+
+    </div>
+
+    <!-- ============ 4b. LIFECYCLE ============ -->
+    <section class="panel green">
+      <div class="p-head">
+        <div class="p-num">5</div>
+        <h2>Request Status Lifecycle</h2>
+        <div class="hint">— ang dadaanan ng bawat document request</div>
+      </div>
+
+      <div class="life">
+        <div class="st pending">Pending</div>
+        <div class="ar">&rarr;</div>
+        <div class="st proc">Processing</div>
+        <div class="ar">&rarr;</div>
+        <div class="st ready">Ready for Pickup</div>
+        <div class="ar">&rarr;</div>
+        <div class="st done">Completed</div>
+
+        <div class="ar gold" style="margin-left:22px">&#10549;</div>
+        <div class="st rej">Cancelled / Rejected</div>
+
+        <div style="margin-left:auto;font-size:14.5px;font-weight:800;color:#5A6B80">
+          Bawat hakbang &rarr; <b style="color:#0F4C81">automatic notification</b> sa estudyante
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <footer class="foot">
+    <span class="dot">&bull;</span><span><b>smart-registrar.onrender.com</b></span>
+    <span class="dot">&bull;</span><span>APK: <b>/downloads/SmartRegistrar.apk</b></span>
+    <span class="dot">&bull;</span><span>QR refs: <b>APT</b> = appointment &middot; <b>REQ</b> = document &middot; <b>STU</b> = student</span>
+    <span class="dot">&bull;</span><span><b>1 slot = 1 student</b></span>
+  </footer>
+
+</div>
+</body>
+</html>
