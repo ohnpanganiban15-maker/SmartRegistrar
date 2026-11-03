@@ -16,11 +16,6 @@ services:
         generateValue: true
       - key: SEED_SAMPLE
         value: "0"
-      # ONE-TIME: sets the admin password to registrar123 after the Supabase
-      # restore. REMOVE this entry once verified — leaving it in would reset
-      # the password on every single boot.
-      - key: RESET_ADMIN_PASSWORD
-        value: registrar123
       - key: PORT
         value: 10000
       - key: HOST
