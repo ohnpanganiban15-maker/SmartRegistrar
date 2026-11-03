@@ -30,8 +30,8 @@ router.get('/dashboard/stats', requireAuth, (req, res) => {
       completedAppointments: c("SELECT COUNT(*) c FROM appointments WHERE status='Completed'"),
       pendingRequests: c("SELECT COUNT(*) c FROM document_requests WHERE status='Pending'"),
       processingRequests: c("SELECT COUNT(*) c FROM document_requests WHERE status='Processing'"),
+      readyRequests: c("SELECT COUNT(*) c FROM document_requests WHERE status='Ready for Pickup'"),
       completedRequests: c("SELECT COUNT(*) c FROM document_requests WHERE status='Completed'"),
-      cancelledRequests: c("SELECT COUNT(*) c FROM document_requests WHERE status IN ('Cancelled','Rejected')"),
       openChats: c("SELECT COUNT(*) c FROM messages WHERE status='Open'"),
       unreadNotifications: c('SELECT COUNT(*) c FROM notifications WHERE is_read=0')
     });
