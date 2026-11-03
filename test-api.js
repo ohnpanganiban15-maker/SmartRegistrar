@@ -229,13 +229,13 @@ async function call(method, path, token, body) {
   const otherEmail = 'other.chat.' + uniq + '@cdlshs.edu.ph';
   r = await call('POST', '/api/auth/register', null, {
     firstName: 'Other', lastName: 'Student', email: otherEmail,
-    password: 'other1234', studentNumber: 'S-2026-O' + uniq.toUpperCase().slice(-6),
+    password: 'other123', studentNumber: 'S-2026-O' + uniq.toUpperCase().slice(-6),
     gradeLevel: '11', strand: 'STEM'
   });
   assert(r.status === 201 && r.data.devOtp, 'chat-observer student registered');
   r = await call('POST', '/api/auth/register/verify-otp', null, { email: otherEmail, otp: r.data.devOtp });
   assert(r.status === 201, 'chat-observer OTP verified');
-  r = await call('POST', '/api/auth/login', null, { email: otherEmail, password: 'other1234' });
+  r = await call('POST', '/api/auth/login', null, { email: otherEmail, password: 'other123' });
   const observerTok = r.data.token;
   r = await call('GET', '/api/messages/' + reqId, observerTok);
   assert(r.status === 403, 'other student blocked from someone else\'s thread');
@@ -357,6 +357,44 @@ async function call(method, path, token, body) {
   assert(r.status === 200, 'password restored for next test run');
   r = await call('POST', '/api/auth/login', null, { email: stuEmail, password: 'fix12345' });
   assert(r.status === 200 && r.data.token, 'original login restored');
+
+  /* --- forgot password (login screen, no session required) --- */
+  const fpEmail = 'fp' + uniq + '@cdlshs.edu.ph';
+  const fpNum = 'S-2026-F' + uniq.toUpperCase().slice(-6);
+  /* unknown email → generic reply, never confirms whether an account exists */
+  r = await call('POST', '/api/auth/forgot-password/request-otp', null, { email: 'ghost' + uniq + '@cdlshs.edu.ph' });
+  assert(r.status === 200 && r.data.message && !r.data.devOtp,
+    'forgot-password: unknown email gets a generic reply with no code');
+  r = await call('POST', '/api/auth/forgot-password/verify-otp', null,
+    { email: 'ghost' + uniq + '@cdlshs.edu.ph', otp: '111111', newPassword: 'fpReset1' });
+  assert(r.status === 404, 'forgot-password: unknown email cannot be reset');
+  /* make a real account, then reset it */
+  r = await call('POST', '/api/auth/register', null, {
+    firstName: 'Fp', lastName: 'Tester', email: fpEmail, password: 'fpTest12',
+    studentNumber: fpNum, gradeLevel: '12', strand: 'STEM'
+  });
+  assert(r.status === 201 && r.data.devOtp, 'forgot-password fixture account registers');
+  r = await call('POST', '/api/auth/register/verify-otp', null, { email: fpEmail, otp: r.data.devOtp });
+  assert(r.status === 201, 'forgot-password fixture account created');
+  r = await call('POST', '/api/auth/forgot-password/request-otp', null, { email: fpEmail });
+  assert(r.status === 200 && r.data.devOtp, 'forgot-password: OTP sent (dev)');
+  const fpOtp = r.data.devOtp;
+  const badOtp = fpOtp === '111111' ? '222222' : '111111';
+  /* weak password is refused without burning the code */
+  r = await call('POST', '/api/auth/forgot-password/verify-otp', null, { email: fpEmail, otp: fpOtp, newPassword: 'short' });
+  assert(r.status === 400 && r.data.error, 'forgot-password: weak password rejected');
+  r = await call('POST', '/api/auth/forgot-password/verify-otp', null, { email: fpEmail, otp: fpOtp, newPassword: 'FixMe12' });
+  assert(r.status === 400, 'forgot-password: 7-character password rejected');
+  /* wrong code refused */
+  r = await call('POST', '/api/auth/forgot-password/verify-otp', null, { email: fpEmail, otp: badOtp, newPassword: 'fpReset1' });
+  assert(r.status === 400 && r.data.error, 'forgot-password: wrong OTP rejected');
+  /* correct code + 8-char password → reset */
+  r = await call('POST', '/api/auth/forgot-password/verify-otp', null, { email: fpEmail, otp: fpOtp, newPassword: 'fpReset1' });
+  assert(r.status === 200 && r.data.message, 'forgot-password: password reset completed');
+  r = await call('POST', '/api/auth/login', null, { email: fpEmail, password: 'fpTest12' });
+  assert(r.status === 401, 'forgot-password: old password no longer works');
+  r = await call('POST', '/api/auth/login', null, { email: fpEmail, password: 'fpReset1' });
+  assert(r.status === 200 && r.data.token, 'forgot-password: new password logs in');
 
   /* --- unknown route --- */
   r = await call('GET', '/api/nope', admin);

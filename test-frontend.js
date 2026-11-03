@@ -116,6 +116,18 @@ const evalA = expr => w.eval(expr);
   w.eval(`togglePass('li-pass', document.querySelector('.pass-eye'))`);
   assert(w.document.getElementById('li-pass').type === 'password', 'eye toggle hides password again');
 
+  /* --- forgot password link lives on the login screen --- */
+  assert($app().includes('Forgot password?'), 'login screen shows a Forgot password link');
+  assert(w.document.getElementById('li-pass').getAttribute('maxlength') === '8',
+    'login password input stops at 8 characters');
+  await w.eval("go('forgotPassword')");
+  await sleep(150);
+  assert(!!w.document.getElementById('fp-email'), 'forgot-password step 1 asks for the email');
+  assert($app().includes('Send reset code'), 'forgot-password step 1 has a send button');
+  await w.eval("go('login')");
+  await sleep(100);
+  assert(w.document.getElementById('li-pass') !== null, 'back to login from forgot password');
+
   /* --- register: show-password eye + values preserved on error --- */
   await w.eval("go('register')");
   await sleep(120);
@@ -123,6 +135,8 @@ const evalA = expr => w.eval(expr);
     !!w.document.querySelector('#rg-pass') , 'register form rendered');
   /* the eye is a sibling button inside .pass-wrap */
   assert(!!w.document.querySelector('.pass-wrap .pass-eye'), 'register password has eye toggle');
+  assert(w.document.getElementById('rg-pass').getAttribute('maxlength') === '8',
+    'register password input stops at 8 characters');
   w.document.getElementById('rg-num').value = '123456789012';
   w.document.getElementById('rg-email').value = 'preserve.test@cdlshs.edu.ph';
   w.document.getElementById('rg-first').value = 'Preserve';

@@ -51,7 +51,7 @@ function initials(name) {
 /* strong-password rules — shared with the server (server/routes/auth.js) */
 function passwordIssue(pw) {
   pw = String(pw || '');
-  if (pw.length < 8) return 'Password must be at least 8 characters.';
+  if (pw.length !== 8) return 'Password must be exactly 8 characters.';
   if (!/[a-zA-Z]/.test(pw) || !/[0-9]/.test(pw)) return 'Password must contain both letters and numbers.';
   const low = pw.toLowerCase();
   const common = ['12345678', '123456789', '1234567890', 'password', 'password1', 'password123',

@@ -25,6 +25,7 @@ const state = {
 
 const VIEWS = {
   login: viewLogin, register: viewRegister, otp: viewOtp, changePassword: viewChangePassword, dashboard: viewDashboard,
+  forgotPassword: viewForgotPassword,
   availability: viewAvailability, apptConfirmed: viewApptConfirmed,
   myAppointments: viewMyAppointments, myRequests: viewMyRequests,
   notifications: viewNotifications, service: viewService, myQr: viewMyQr,
@@ -53,7 +54,7 @@ function themeBtnHTML() {
 /* ---------- data loading per view ---------- */
 async function loadView(view) {
   switch (view) {
-    case 'login': case 'register': case 'otp': case 'changePassword': return;
+    case 'login': case 'register': case 'otp': case 'changePassword': case 'forgotPassword': return;
     case 'dashboard': {
       const [stats, appts, slots, anns] = await Promise.all([
         Api.get('/api/dashboard/stats'), Api.get('/api/appointments'),
@@ -117,7 +118,7 @@ async function loadView(view) {
 
 /* ---------- navigation ---------- */
 async function go(view, patch) {
-  if (!state.me && view !== 'login' && view !== 'register' && view !== 'otp') view = 'login';
+  if (!state.me && ['login', 'register', 'otp', 'forgotPassword'].indexOf(view) === -1) view = 'login';
   if (state.me && state.me.role !== 'admin' && isAdminView(view)) view = 'dashboard';
   if (patch) Object.assign(state, patch);
   state.view = view;
@@ -142,6 +143,7 @@ function render() {
   }
   if (state.view === 'register') { app.innerHTML = viewRegister(); restoreFormValues(); return; }
   if (state.view === 'otp') { app.innerHTML = viewOtp(); return; }
+  if (state.view === 'forgotPassword') { app.innerHTML = viewForgotPassword(); return; }
 
   const viewFn = VIEWS[state.view] || VIEWS.dashboard;
   let content;
@@ -580,6 +582,62 @@ async function doChangePasswordVerifyOtp(e) {
     state.error = err.message;
     render();
   }
+}
+
+/* ---------- forgot password (from the login screen) ---------- */
+async function doForgotRequestOtp(e) {
+  e.preventDefault();
+  state.error = '';
+  const email = document.getElementById('fp-email').value.trim();
+  if (!email) { state.error = 'Enter your email address'; return render(); }
+  state.forgot = { email, step: 1 };
+  try {
+    const data = await Api.post('/api/auth/forgot-password/request-otp', { email });
+    state.forgot = { email, step: 2 };
+    state.devOtp = (data && data.devOtp) || '';
+    state.error = '';
+    toast('Reset code sent — check your email.');
+    render();
+  } catch (err) {
+    state.error = err.message;
+    render();
+  }
+}
+
+async function doForgotVerifyOtp(e) {
+  e.preventDefault();
+  state.error = '';
+  const email = state.forgot ? state.forgot.email : '';
+  const otp = document.getElementById('fp-otp').value.trim();
+  const newPassword = document.getElementById('fp-new').value;
+  const confirm = document.getElementById('fp-confirm').value;
+  if (!email) { state.error = 'Please request a code again.'; state.forgot = null; return go('login'); }
+  if (otp.length !== 6) { state.error = 'Enter the 6-digit code'; return render(); }
+  if (newPassword !== confirm) { state.error = 'Passwords do not match'; return render(); }
+  const weak = passwordIssue(newPassword);
+  if (weak) { state.error = weak; return render(); }
+  try {
+    const data = await Api.post('/api/auth/forgot-password/verify-otp', { email, otp, newPassword });
+    toast((data && data.message) || 'Password reset — you can now sign in.');
+    state.error = ''; state.devOtp = ''; state.forgot = null;
+    go('login');
+  } catch (err) {
+    state.error = err.message;
+    render();
+  }
+}
+
+async function forgotResend() {
+  if (!state.forgot || !state.forgot.email) { state.forgot = null; return go('login'); }
+  state.error = '';
+  try {
+    const data = await Api.post('/api/auth/forgot-password/request-otp', { email: state.forgot.email });
+    state.devOtp = (data && data.devOtp) || '';
+    toast('New code sent — check your email.');
+  } catch (err) {
+    state.error = err.message;
+  }
+  render();
 }
 
 function resendOtp() {

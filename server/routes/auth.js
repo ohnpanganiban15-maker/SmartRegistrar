@@ -62,7 +62,7 @@ function canSendOtp(email, purpose) {
 /* strong-password rules — shared with the client (public/js/util.js) */
 function passwordIssue(pw) {
   pw = String(pw || '');
-  if (pw.length < 8) return 'Password must be at least 8 characters.';
+  if (pw.length !== 8) return 'Password must be exactly 8 characters.';
   if (!/[a-zA-Z]/.test(pw) || !/[0-9]/.test(pw)) return 'Password must contain both letters and numbers.';
   const low = pw.toLowerCase();
   const common = ['12345678', '123456789', '1234567890', 'password', 'password1', 'password123',
@@ -237,6 +237,61 @@ router.post('/change-password/verify-otp', requireAuth, (req, res) => {
     hashPassword(result.payload.newPassword), tv, user.id);
   logActivity(user.id, user.name, 'CHANGE_PASSWORD', user.email + ' (OTP verified)');
   res.json({ message: 'Password changed. Other sessions were signed out.', token: signToken({ ...user, token_version: tv }) });
+});
+
+/* ============================================================
+   FORGOT PASSWORD (walang kailangang naka-login)
+   Step 1: POST /api/auth/forgot-password/request-otp  { email }
+   Step 2: POST /api/auth/forgot-password/verify-otp   { email, otp, newPassword }
+   Gumagamit ng parehong `change_password` OTP purpose —
+   kaya walang kailangang schema migration.
+============================================================ */
+
+/* Step 1: send the 6-digit code */
+router.post('/forgot-password/request-otp', async (req, res) => {
+  const b = req.body || {};
+  if (!validateBody(res, b, ['email'])) return;
+  const email = String(b.email).toLowerCase().trim();
+
+  /* generic reply — huwag ipaalam kung may account o wala (anti-enumeration) */
+  const reply = { message: 'If an account exists for ' + email + ', a 6-digit code has been sent.' };
+
+  const user = q.get('SELECT * FROM users WHERE email = ?', email);
+  if (!user) return res.json(reply);
+
+  if (!canSendOtp(email, 'change_password')) {
+    return res.status(429).json({ error: 'Too many OTP requests. Please wait 15 minutes.' });
+  }
+  const code = createOtp(email, 'change_password', { reset: true });
+  try {
+    const info = await sendOtpMail(email, code, 'change_password');
+    if (info && info.dev) reply.devOtp = code;
+    res.json(reply);
+  } catch (err) {
+    res.status(502).json({ error: err.message });
+  }
+});
+
+/* Step 2: verify the code + set the new password */
+router.post('/forgot-password/verify-otp', (req, res) => {
+  const b = req.body || {};
+  if (!validateBody(res, b, ['email', 'otp', 'newPassword'])) return;
+  const email = String(b.email).toLowerCase().trim();
+  const user = q.get('SELECT * FROM users WHERE email = ?', email);
+  if (!user) return res.status(404).json({ error: 'No account found with that email.' });
+
+  const weakNew = passwordIssue(b.newPassword);
+  if (weakNew) return res.status(400).json({ error: weakNew });
+
+  const result = verifyOtpRecord(email, 'change_password', String(b.otp).trim());
+  if (!result.ok) return res.status(400).json({ error: result.error });
+
+  /* bagong password + i-reset ang lockout at lahat ng lumang session */
+  const tv = (user.token_version || 0) + 1;
+  q.run("UPDATE users SET password_hash=?, token_version=?, failed_attempts=0, locked_until='' WHERE id=?",
+    hashPassword(String(b.newPassword)), tv, user.id);
+  logActivity(user.id, user.name, 'RESET_PASSWORD', user.email + ' (forgot password, OTP verified)');
+  res.json({ message: 'Password reset. You can now sign in with your new password.' });
 });
 
 /* GET /api/auth/me */

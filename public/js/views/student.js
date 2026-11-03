@@ -23,7 +23,7 @@ function viewLogin() {
         <div class="field">
           <label for="li-pass">Password</label>
           <div class="pass-wrap">
-            <input class="input" id="li-pass" type="password" autocomplete="current-password" placeholder="••••••••" required>
+            <input class="input" id="li-pass" type="password" maxlength="8" autocomplete="current-password" placeholder="••••••••" required>
             <button type="button" class="pass-eye" onclick="togglePass('li-pass', this)"
               title="Show password" aria-label="Show password">👁</button>
           </div>
@@ -31,10 +31,77 @@ function viewLogin() {
         <button class="btn btn-primary btn-block" type="submit">Sign in</button>
       </form>
       <div class="auth-switch">
+        <a onclick="go('forgotPassword')">Forgot password?</a>
+      </div>
+      <div class="auth-switch">
         New student? <a onclick="go('register')">Create an account</a>
       </div>
       <div class="auth-switch small">
         Registrar staff? Sign in with your admin account.
+      </div>
+    </div>
+  </div>`;
+}
+
+/* ---------------- FORGOT PASSWORD ---------------- */
+function viewForgotPassword() {
+  const f = state.forgot || { email: '', step: 1 };
+  const step2 = f.step === 2;
+  return `
+  <div class="auth-page">
+    <div class="auth-card">
+      <div class="auth-brand">
+        <div class="auth-badge logo-badge"><img src="assets/logo.jpg" alt="CDLSHS logo"></div>
+        <h1>Forgot Password</h1>
+        <p>${step2 ? 'Enter the 6-digit code we emailed you' : 'We will email you a 6-digit code'}</p>
+      </div>
+      ${state.error ? `<div class="form-error">${esc(state.error)}</div>` : ''}
+      ${state.devOtp ? `
+        <div style="background:#FFF7E0;border:1.5px solid #E6B800;border-radius:10px;padding:10px 14px;margin-bottom:12px;text-align:center;">
+          <span class="muted small">DEV MODE (Gmail not set) — your code:</span><br>
+          <strong style="font-size:26px;letter-spacing:8px;">${esc(state.devOtp)}</strong>
+        </div>` : ''}
+      ${!step2 ? `
+      <form onsubmit="doForgotRequestOtp(event)">
+        <div class="field">
+          <label for="fp-email">Email address</label>
+          <input class="input" id="fp-email" type="email" autocomplete="username"
+                 placeholder="you@cdlshs.edu.ph" value="${esc(f.email || '')}" required autofocus>
+        </div>
+        <button class="btn btn-primary btn-block" type="submit">Send reset code</button>
+      </form>` : `
+      <form onsubmit="doForgotVerifyOtp(event)">
+        <div class="field">
+          <label for="fp-otp">One-Time Password (OTP)</label>
+          <input class="input" id="fp-otp" inputmode="numeric" pattern="[0-9]{6}" maxlength="6"
+                 placeholder="000000" autocomplete="one-time-code" required autofocus>
+        </div>
+        <div class="field">
+          <label for="fp-new">New Password</label>
+          <div class="pass-wrap">
+            <input class="input" id="fp-new" type="password" minlength="8" maxlength="8"
+                   autocomplete="new-password" placeholder="exactly 8 characters + letters &amp; numbers" required>
+            <button type="button" class="pass-eye" onclick="togglePass('fp-new', this)"
+              title="Show password" aria-label="Show password">👁</button>
+          </div>
+        </div>
+        <div class="field">
+          <label for="fp-confirm">Confirm New Password</label>
+          <div class="pass-wrap">
+            <input class="input" id="fp-confirm" type="password" minlength="8" maxlength="8"
+                   autocomplete="new-password" required>
+            <button type="button" class="pass-eye" onclick="togglePass('fp-confirm', this)"
+              title="Show password" aria-label="Show password">👁</button>
+          </div>
+        </div>
+        <button class="btn btn-primary btn-block" type="submit">Reset password</button>
+      </form>`}
+      <div class="auth-switch">
+        ${step2 ? `<a onclick="forgotResend()">Resend code</a> &middot; ` : ''}
+        <a onclick="go('login')">Back to Sign in</a>
+      </div>
+      <div class="muted small" style="text-align:center;margin-top:8px;">
+        Code expires in 10 minutes. Check your spam/junk folder.
       </div>
     </div>
   </div>`;
@@ -100,7 +167,7 @@ function viewRegister() {
           <input class="input" id="rg-contact" placeholder="09XX XXX XXXX"></div>
         <div class="field"><label>Password</label>
           <div class="pass-wrap">
-            <input class="input" id="rg-pass" type="password" minlength="8" placeholder="at least 8 characters + letters &amp; numbers" required>
+            <input class="input" id="rg-pass" type="password" minlength="8" maxlength="8" placeholder="exactly 8 characters + letters &amp; numbers" required>
             <button type="button" class="pass-eye" onclick="togglePass('rg-pass', this)" title="Show password" aria-label="Show password">👁</button>
           </div>
         </div>
@@ -162,17 +229,17 @@ function viewChangePassword() {
       <form onsubmit="doChangePasswordRequestOtp(event)">
         <div class="field"><label>Current Password</label>
           <div class="pass-wrap">
-            <input class="input" id="cp-current" type="password" autocomplete="current-password" required>
+            <input class="input" id="cp-current" type="password" maxlength="8" autocomplete="current-password" required>
             <button type="button" class="pass-eye" onclick="togglePass('cp-current', this)" title="Show password" aria-label="Show password">👁</button>
           </div></div>
         <div class="field"><label>New Password</label>
           <div class="pass-wrap">
-            <input class="input" id="cp-new" type="password" minlength="8" autocomplete="new-password" placeholder="at least 8 characters + letters &amp; numbers" required>
+            <input class="input" id="cp-new" type="password" minlength="8" maxlength="8" autocomplete="new-password" placeholder="exactly 8 characters + letters &amp; numbers" required>
             <button type="button" class="pass-eye" onclick="togglePass('cp-new', this)" title="Show password" aria-label="Show password">👁</button>
           </div></div>
         <div class="field"><label>Confirm New Password</label>
           <div class="pass-wrap">
-            <input class="input" id="cp-confirm" type="password" minlength="6" autocomplete="new-password" required>
+            <input class="input" id="cp-confirm" type="password" minlength="8" maxlength="8" autocomplete="new-password" required>
             <button type="button" class="pass-eye" onclick="togglePass('cp-confirm', this)" title="Show password" aria-label="Show password">👁</button>
           </div></div>
         <button class="btn btn-primary btn-block" type="submit">Send OTP &amp; Continue</button>
