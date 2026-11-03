@@ -550,7 +550,7 @@ async function doChangePasswordRequestOtp(e) {
   const stash = { currentPassword, newPassword, confirm };
   const keepCp = () => { state.form = state.form || {}; state.form.cp = stash; };
   if (newPassword !== confirm) { keepCp(); state.error = 'Passwords do not match'; return render(); }
-  const weak = passwordIssue(newPassword);
+  const weak = passwordIssue(newPassword, pwMaxFor(state.me ? state.me.role : 'student'));
   if (weak) { keepCp(); state.error = weak; return render(); }
   try {
     const data = await Api.post('/api/auth/change-password/request-otp', { currentPassword, newPassword });
@@ -614,7 +614,9 @@ async function doForgotVerifyOtp(e) {
   if (!email) { state.error = 'Please request a code again.'; state.forgot = null; return go('login'); }
   if (otp.length !== 6) { state.error = 'Enter the 6-digit code'; return render(); }
   if (newPassword !== confirm) { state.error = 'Passwords do not match'; return render(); }
-  const weak = passwordIssue(newPassword);
+  /* hindi alam ng client kung admin o student ang account — 12 ang maximum,
+     ang server ang magpapatupad ng tamang limit ayon sa role */
+  const weak = passwordIssue(newPassword, ADMIN_MAX_PW);
   if (weak) { state.error = weak; return render(); }
   try {
     const data = await Api.post('/api/auth/forgot-password/verify-otp', { email, otp, newPassword });

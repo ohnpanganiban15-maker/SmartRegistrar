@@ -21,9 +21,9 @@ async function call(method, path, token, body) {
   purge();
 
   /* --- auth --- */
-  let r = await call('POST', '/api/auth/login', null, { email: 'admin@cdlshs.edu.ph', password: 'admin123' });
+  let r = await call('POST', '/api/auth/login', null, { email: 'admin@cdlshs.edu.ph', password: 'registrar123' });
   assert(r.status === 200 && r.data.token, 'admin login');
-  const admin = r.data.token;
+  let admin = r.data.token;
 
   /* --- fixture student (tests register their own data — no seed examples) --- */
   const uniq = Date.now().toString(36);
@@ -395,6 +395,21 @@ async function call(method, path, token, body) {
   assert(r.status === 401, 'forgot-password: old password no longer works');
   r = await call('POST', '/api/auth/login', null, { email: fpEmail, password: 'fpReset1' });
   assert(r.status === 200 && r.data.token, 'forgot-password: new password logs in');
+  const fpTok = r.data.token;
+
+  /* --- per-role password length: student = exactly 8, admin = up to 12 --- */
+  r = await call('POST', '/api/auth/change-password/request-otp', fpTok,
+    { currentPassword: 'fpReset1', newPassword: 'nineChar1' });
+  assert(r.status === 400 && /exactly 8/.test(r.data.error || ''),
+    'student still capped at exactly 8 characters');
+  r = await call('POST', '/api/auth/forgot-password/request-otp', null, { email: 'admin@cdlshs.edu.ph' });
+  assert(r.status === 200 && r.data.devOtp, 'admin forgot-password OTP sent (dev)');
+  r = await call('POST', '/api/auth/forgot-password/verify-otp', null,
+    { email: 'admin@cdlshs.edu.ph', otp: r.data.devOtp, newPassword: 'registrar123' });
+  assert(r.status === 200, 'admin may set a 12-character password');
+  r = await call('POST', '/api/auth/login', null, { email: 'admin@cdlshs.edu.ph', password: 'registrar123' });
+  assert(r.status === 200 && r.data.token, 'admin logs in with registrar123');
+  admin = r.data.token;
 
   /* --- unknown route --- */
   r = await call('GET', '/api/nope', admin);

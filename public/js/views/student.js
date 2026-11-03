@@ -23,7 +23,7 @@ function viewLogin() {
         <div class="field">
           <label for="li-pass">Password</label>
           <div class="pass-wrap">
-            <input class="input" id="li-pass" type="password" maxlength="8" autocomplete="current-password" placeholder="••••••••" required>
+            <input class="input" id="li-pass" type="password" maxlength="12" autocomplete="current-password" placeholder="••••••••" required>
             <button type="button" class="pass-eye" onclick="togglePass('li-pass', this)"
               title="Show password" aria-label="Show password">👁</button>
           </div>
@@ -79,8 +79,8 @@ function viewForgotPassword() {
         <div class="field">
           <label for="fp-new">New Password</label>
           <div class="pass-wrap">
-            <input class="input" id="fp-new" type="password" minlength="8" maxlength="8"
-                   autocomplete="new-password" placeholder="exactly 8 characters + letters &amp; numbers" required>
+            <input class="input" id="fp-new" type="password" minlength="8" maxlength="12"
+                   autocomplete="new-password" placeholder="8 to 12 characters + letters &amp; numbers" required>
             <button type="button" class="pass-eye" onclick="togglePass('fp-new', this)"
               title="Show password" aria-label="Show password">👁</button>
           </div>
@@ -88,7 +88,7 @@ function viewForgotPassword() {
         <div class="field">
           <label for="fp-confirm">Confirm New Password</label>
           <div class="pass-wrap">
-            <input class="input" id="fp-confirm" type="password" minlength="8" maxlength="8"
+            <input class="input" id="fp-confirm" type="password" minlength="8" maxlength="12"
                    autocomplete="new-password" required>
             <button type="button" class="pass-eye" onclick="togglePass('fp-confirm', this)"
               title="Show password" aria-label="Show password">👁</button>
@@ -229,17 +229,18 @@ function viewChangePassword() {
       <form onsubmit="doChangePasswordRequestOtp(event)">
         <div class="field"><label>Current Password</label>
           <div class="pass-wrap">
-            <input class="input" id="cp-current" type="password" maxlength="8" autocomplete="current-password" required>
+            <input class="input" id="cp-current" type="password" maxlength="12" autocomplete="current-password" required>
             <button type="button" class="pass-eye" onclick="togglePass('cp-current', this)" title="Show password" aria-label="Show password">👁</button>
           </div></div>
         <div class="field"><label>New Password</label>
           <div class="pass-wrap">
-            <input class="input" id="cp-new" type="password" minlength="8" maxlength="8" autocomplete="new-password" placeholder="exactly 8 characters + letters &amp; numbers" required>
+            <input class="input" id="cp-new" type="password" minlength="8" maxlength="12" autocomplete="new-password"
+                   placeholder="${(state.me && state.me.role === 'admin') ? '8 to 12 characters' : 'exactly 8 characters'} + letters &amp; numbers" required>
             <button type="button" class="pass-eye" onclick="togglePass('cp-new', this)" title="Show password" aria-label="Show password">👁</button>
           </div></div>
         <div class="field"><label>Confirm New Password</label>
           <div class="pass-wrap">
-            <input class="input" id="cp-confirm" type="password" minlength="8" maxlength="8" autocomplete="new-password" required>
+            <input class="input" id="cp-confirm" type="password" minlength="8" maxlength="12" autocomplete="new-password" required>
             <button type="button" class="pass-eye" onclick="togglePass('cp-confirm', this)" title="Show password" aria-label="Show password">👁</button>
           </div></div>
         <button class="btn btn-primary btn-block" type="submit">Send OTP &amp; Continue</button>

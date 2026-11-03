@@ -56,7 +56,7 @@ Ang ginagawa nito (mga 3–5 minuto): Node 24 · Caddy (libreng auto-HTTPS) · s
 ## 4. Unang login
 
 1. Browser → **https://yourdomain.com**
-2. Login: `admin@cdlshs.edu.ph` / `admin123`
+2. Login: `admin@cdlshs.edu.ph` / `registrar123`
 3. **PALITAN AGAD** ang password (gear/change password sa app).
 
 ---

@@ -59,10 +59,20 @@ function canSendOtp(email, purpose) {
   return n < 3;
 }
 
-/* strong-password rules — shared with the client (public/js/util.js) */
-function passwordIssue(pw) {
+/* strong-password rules — shared with the client (public/js/util.js)
+   Students are locked to exactly 8 characters; admin may go up to 12. */
+const ADMIN_MAX_PW = 12;
+function pwMaxFor(role) { return role === 'admin' ? ADMIN_MAX_PW : 8; }
+
+function passwordIssue(pw, maxLen) {
   pw = String(pw || '');
-  if (pw.length !== 8) return 'Password must be exactly 8 characters.';
+  const max = parseInt(maxLen, 10) || 8;
+  if (pw.length < 8) return 'Password must be at least 8 characters.';
+  if (pw.length > max) {
+    return max === 8
+      ? 'Password must be exactly 8 characters.'
+      : 'Password must be at most ' + max + ' characters.';
+  }
   if (!/[a-zA-Z]/.test(pw) || !/[0-9]/.test(pw)) return 'Password must contain both letters and numbers.';
   const low = pw.toLowerCase();
   const common = ['12345678', '123456789', '1234567890', 'password', 'password1', 'password123',
@@ -202,7 +212,7 @@ router.post('/change-password/request-otp', requireAuth, async (req, res) => {
   if (!verifyPassword(b.currentPassword, user.password_hash)) {
     return res.status(400).json({ error: 'Current password is incorrect' });
   }
-  const weakNew = passwordIssue(b.newPassword);
+  const weakNew = passwordIssue(b.newPassword, pwMaxFor(req.user.role));
   if (weakNew) return res.status(400).json({ error: weakNew });
   if (String(b.newPassword) === String(b.currentPassword)) {
     return res.status(400).json({ error: 'New password must be different from the current one' });
@@ -280,7 +290,7 @@ router.post('/forgot-password/verify-otp', (req, res) => {
   const user = q.get('SELECT * FROM users WHERE email = ?', email);
   if (!user) return res.status(404).json({ error: 'No account found with that email.' });
 
-  const weakNew = passwordIssue(b.newPassword);
+  const weakNew = passwordIssue(b.newPassword, pwMaxFor(user.role));
   if (weakNew) return res.status(400).json({ error: weakNew });
 
   const result = verifyOtpRecord(email, 'change_password', String(b.otp).trim());

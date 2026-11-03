@@ -118,8 +118,8 @@ const evalA = expr => w.eval(expr);
 
   /* --- forgot password link lives on the login screen --- */
   assert($app().includes('Forgot password?'), 'login screen shows a Forgot password link');
-  assert(w.document.getElementById('li-pass').getAttribute('maxlength') === '8',
-    'login password input stops at 8 characters');
+  assert(w.document.getElementById('li-pass').getAttribute('maxlength') === '12',
+    'login password input accepts up to 12 characters (admin may be longer)');
   await w.eval("go('forgotPassword')");
   await sleep(150);
   assert(!!w.document.getElementById('fp-email'), 'forgot-password step 1 asks for the email');
@@ -258,7 +258,7 @@ const evalA = expr => w.eval(expr);
   w.eval(`logout()`);
   await sleep(100);
   w.document.getElementById('li-email').value = 'admin@cdlshs.edu.ph';
-  w.document.getElementById('li-pass').value = 'admin123';
+  w.document.getElementById('li-pass').value = 'registrar123';
   await w.doLogin({ preventDefault: () => {} });
   await sleep(250);
   assert($app().includes('Registrar Dashboard'), 'admin dashboard renders after login');

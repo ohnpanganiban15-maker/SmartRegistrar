@@ -40,7 +40,7 @@ function seed() {
   /* ---- users: 1 admin ---- */
   q.run(
     "INSERT INTO users (name, email, password_hash, role) VALUES (?,?,?,?)",
-    'Registrar Admin', 'admin@cdlshs.edu.ph', hashPassword('admin123'), 'admin'
+    'Registrar Admin', 'admin@cdlshs.edu.ph', hashPassword('registrar123'), 'admin'
   );
 
   const studentIds = [];

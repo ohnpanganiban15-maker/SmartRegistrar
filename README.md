@@ -87,7 +87,7 @@ same Wi-Fi network.
 
 | Role | Email | Password | Use for |
 |---|---|---|---|
-| **Admin / Registrar** | `admin@cdlshs.edu.ph` | `admin123` | Admin dashboard, managing everything |
+| **Admin / Registrar** | `admin@cdlshs.edu.ph` | `registrar123` | Admin dashboard, managing everything |
 | Student | — | — | No sample students — create accounts via **"Create an account"** on the login screen (self-register) |
 
 > ⚠️ Change the admin password in a real deployment (see Troubleshooting → "Change admin password").
@@ -485,7 +485,7 @@ PC itself (`localhost`), or build the APK (which requests camera permission).
 **Change the admin password**
 → Register/login normally, or edit the database with any SQLite browser and replace the
 `password_hash` of `admin@cdlshs.edu.ph` with a new bcrypt hash. (Simplest demo approach:
-delete the DB, seed fresh, and change `hashPassword('admin123')` in `server/seed.js`.)
+delete the DB, seed fresh, and change `hashPassword('registrar123')` in `server/seed.js`.)
 
 **Firebase / internet errors**
 → None possible — this system does **not** use Firebase or any cloud service. If you see
