@@ -135,11 +135,11 @@
       </tr>
     </thead>
     <tbody>
-      <tr><td class="num">1.</td><td class="stmt">I feel that my personal information is kept secure inside the system.</td><td></td><td></td><td></td><td></td><td></td></tr>
-      <tr><td class="num">2.</td><td class="stmt">My account is protected — wrong passwords are rejected, and repeated failed logins temporarily lock the account.</td><td></td><td></td><td></td><td></td><td></td></tr>
-      <tr><td class="num">3.</td><td class="stmt">Only the registrar/admin can process requests, manage records, export data, and back up the database; students cannot access other people's data.</td><td></td><td></td><td></td><td></td><td></td></tr>
-      <tr><td class="num">4.</td><td class="stmt">The system automatically signs me out after a period of inactivity, and asks for confirmation before cancelling, rejecting, or deleting anything.</td><td></td><td></td><td></td><td></td><td></td></tr>
-      <tr><td class="num">5.</td><td class="stmt">The system handles errors safely (it shows clear warning messages) and does not lose my submitted data.</td><td></td><td></td><td></td><td></td><td></td></tr>
+      <tr><td class="num">1.</td><td class="stmt">I feel that my personal information is kept secure inside the system &mdash; my password is stored only as an encrypted (bcrypt) hash and can never be read back.</td><td></td><td></td><td></td><td></td><td></td></tr>
+      <tr><td class="num">2.</td><td class="stmt">My account is protected: wrong passwords are rejected, and 5 consecutive failed logins temporarily lock the account for 15 minutes.</td><td></td><td></td><td></td><td></td><td></td></tr>
+      <tr><td class="num">3.</td><td class="stmt">Only the registrar/admin can process requests, manage records, export data, and back up the database &mdash; these admin pages return an access-denied error if a student tries to open them.</td><td></td><td></td><td></td><td></td><td></td></tr>
+      <tr><td class="num">4.</td><td class="stmt">Before anything is cancelled, rejected, or deleted, the system always asks for confirmation first, so no record is removed by accident.</td><td></td><td></td><td></td><td></td><td></td></tr>
+      <tr><td class="num">5.</td><td class="stmt">The system handles errors safely: it shows clear warning messages and does not lose the data I have already typed &mdash; including the OTP code and the forgot-password form.</td><td></td><td></td><td></td><td></td><td></td></tr>
     </tbody>
   </table>
 
