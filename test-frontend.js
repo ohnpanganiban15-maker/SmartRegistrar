@@ -157,6 +157,26 @@ const evalA = expr => w.eval(expr);
   await w.eval("go('login')");
   await sleep(80);
 
+  /* --- failed login: keep the email, clear only the password --- */
+  w.document.getElementById('li-email').value = em1;
+  w.document.getElementById('li-pass').value = 'wrongpw1';
+  await w.doLogin({ preventDefault: () => {} });
+  await sleep(150);
+  assert(!!w.document.querySelector('#app .form-error'), 'failed login shows an error message');
+  assert(w.document.getElementById('li-pass') !== null,
+    'failed login stays on the login screen');
+  assert(w.document.getElementById('li-email').value === em1,
+    'failed login keeps the typed email address');
+  assert(w.document.getElementById('li-pass').value === '',
+    'failed login clears the password field only');
+  /* the remembered email must not leak into other screens */
+  await w.eval("go('register')");
+  await sleep(80);
+  await w.eval("go('login')");
+  await sleep(80);
+  assert(w.document.getElementById('li-email').value === '',
+    'stale email is dropped after navigating away from login');
+
   /* --- student login --- */
   w.document.getElementById('li-email').value = em1;
   w.document.getElementById('li-pass').value = 'fix12345';

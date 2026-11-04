@@ -121,6 +121,8 @@ async function go(view, patch) {
   if (!state.me && ['login', 'register', 'otp', 'forgotPassword'].indexOf(view) === -1) view = 'login';
   if (state.me && state.me.role !== 'admin' && isAdminView(view)) view = 'dashboard';
   if (patch) Object.assign(state, patch);
+  /* a remembered login address only matters while the user is on the login screen */
+  if (view !== 'login' && state.form) delete state.form.li;
   state.view = view;
   state.error = '';
   state.loading = true;
@@ -139,6 +141,7 @@ function render() {
   if (state.view === '__setup') { app.innerHTML = viewSetup(); return; }
   if (state.view === 'login') {
     app.innerHTML = viewLogin();
+    restoreFormValues();   /* keep the email typed; the password is deliberately dropped */
     return;
   }
   if (state.view === 'register') { app.innerHTML = viewRegister(); restoreFormValues(); return; }
@@ -187,6 +190,10 @@ function postRender() {
 function _setFormVal(id, v) { const el = document.getElementById(id); if (el && v != null) el.value = v; }
 function restoreFormValues() {
   const f = state.form || {};
+  if (state.view === 'login' && f.li) {
+    /* a failed login keeps the address so the user only retypes the password */
+    _setFormVal('li-email', f.li.email);
+  }
   if (state.view === 'register' && f.rg) {
     const g = f.rg;
     _setFormVal('rg-num', g.studentNumber);
@@ -468,11 +475,15 @@ async function doLogin(e) {
   const password = document.getElementById('li-pass').value;
   try {
     const data = await Api.post('/api/auth/login', { email, password });
+    if (state.form) delete state.form.li;
     Api.saveSession(data.token, data.user);
     state.me = await Api.get('/api/auth/me');
     toast('Welcome back, ' + data.user.name + '!');
     await go(data.user.role === 'admin' ? 'adminDashboard' : 'dashboard');
   } catch (err) {
+    /* wrong credentials: remember the email, clear the password */
+    state.form = state.form || {};
+    state.form.li = { email };
     state.error = err.message;
     render();
   }
@@ -659,6 +670,7 @@ function logout() {
   state.confirmed = null;
   state.view = 'login';
   state.error = '';
+  if (state.form) delete state.form.li;   /* fresh login screen, no stale address */
   if (typeof Chat !== 'undefined') Chat.reset();
   render();
 }
