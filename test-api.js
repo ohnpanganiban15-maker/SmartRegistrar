@@ -433,6 +433,12 @@ async function call(method, path, token, body) {
     'local .env leaves both Gmail variables empty');
   assert(!('gmail_keys' in r.data),
     'no environment enumeration field on the public endpoint');
+  /* only GMAIL-ish names may appear, and only as identifier-like strings */
+  assert(Array.isArray(r.data.gmail.matched) &&
+    r.data.gmail.matched.every(n => /^[A-Za-z0-9_]+( <trailing-space>)?$/.test(n)),
+    'gmail matched entries are bare names, never values');
+  assert(r.data.gmail.matched.length > 0,
+    'local .env defines the Gmail names (empty values still register as names)');
 
   /* --- Google sign-in fully removed: no config leak, no auth endpoints --- */
   r = await call('GET', '/api/app/config');

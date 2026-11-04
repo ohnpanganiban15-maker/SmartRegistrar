@@ -20,15 +20,22 @@ const router = express.Router();
    secret ever leaves the server. mail:false means OTP runs in DEV MODE.
 
    `gmail` reports, per expected variable, whether a NON-EMPTY value is
-   present. That is enough to pinpoint a missing or mistyped entry (e.g.
-   GMAILUSER) without ever enumerating the environment or exposing a value. */
+   present — enough to pinpoint a missing entry. `matched` lists the *names*
+   (never values) of every environment variable containing "gmail" in any
+   case, so a mistyped key such as "GMAIL_USER " or "gmailUser" is visible
+   instead of silently ignored. Names are not credentials. */
 router.get('/app/version', (req, res) => {
+  const matched = Object.keys(process.env)
+    .filter(k => /gmail/i.test(k))
+    .map(k => k.replace(/\s+$/, '') + (k !== k.replace(/\s+$/, '') ? ' <trailing-space>' : ''))
+    .sort();
   res.json({
     version, updated_at: bootedAt, name: 'CDLSHS Smart Registrar',
     mail: isConfigured(),
     gmail: {
       user: !!process.env.GMAIL_USER,
-      appPassword: !!process.env.GMAIL_APP_PASSWORD
+      appPassword: !!process.env.GMAIL_APP_PASSWORD,
+      matched
     }
   });
 });
