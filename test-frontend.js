@@ -177,6 +177,65 @@ const evalA = expr => w.eval(expr);
   assert(w.document.getElementById('li-email').value === '',
     'stale email is dropped after navigating away from login');
 
+  /* --- a rejected OTP must not erase what the user already typed --- */
+  await w.eval("state.otpPurpose='register'; state.otpEmail='no.such.user@cdlshs.edu.ph'; go('otp')");
+  await sleep(150);
+  assert(!!w.document.getElementById('otp-code'), 'OTP screen rendered');
+  w.document.getElementById('otp-code').value = '123456';
+  await w.eval("doVerifyRegisterOtp({ preventDefault: () => {} })");
+  await sleep(250);
+  assert(!!w.document.querySelector('#app .form-error'), 'wrong OTP shows an error message');
+  assert(w.document.getElementById('otp-code') !== null,
+    'OTP screen stays after a rejected code');
+  assert(w.document.getElementById('otp-code').value === '123456',
+    'OTP screen keeps the typed code after an error');
+  /* the remembered code must not leak into a later visit */
+  await w.eval("go('login')");
+  await sleep(100);
+  assert(w.eval("state.otpCode") === '',
+    'stale OTP code is dropped after leaving the OTP screen');
+  await w.eval("go('otp')");
+  await sleep(120);
+  assert(w.document.getElementById('otp-code').value === '',
+    'reopened OTP screen starts empty');
+  await w.eval("go('login')");
+  await sleep(80);
+
+  /* --- a failed password reset must not wipe the form --- */
+  await w.eval("state.forgot={ email:'no.such.user@cdlshs.edu.ph', step:2 }; go('forgotPassword')");
+  await sleep(150);
+  assert(!!w.document.getElementById('fp-otp'), 'forgot-password step 2 rendered');
+  w.document.getElementById('fp-otp').value = '654321';
+  w.document.getElementById('fp-new').value = 'abc';
+  w.document.getElementById('fp-confirm').value = 'abc';
+  await w.eval("doForgotVerifyOtp({ preventDefault: () => {} })");
+  await sleep(200);
+  assert(!!w.document.querySelector('#app .form-error'), 'weak reset password shows an error');
+  assert(w.document.getElementById('fp-otp').value === '654321',
+    'reset form keeps the typed OTP after a client-side error');
+  assert(w.document.getElementById('fp-new').value === 'abc',
+    'reset form keeps the new password after a client-side error');
+  assert(w.document.getElementById('fp-confirm').value === 'abc',
+    'reset form keeps the confirmation after a client-side error');
+  /* the same guarantee when the SERVER rejects the submission */
+  w.document.getElementById('fp-otp').value = '111111';
+  w.document.getElementById('fp-new').value = 'abcdefgh1';
+  w.document.getElementById('fp-confirm').value = 'abcdefgh1';
+  await w.eval("doForgotVerifyOtp({ preventDefault: () => {} })");
+  await sleep(350);
+  assert(!!w.document.querySelector('#app .form-error'), 'unknown account shows an error');
+  assert(w.document.getElementById('fp-otp').value === '111111',
+    'reset form keeps the typed OTP after a server rejection');
+  assert(w.document.getElementById('fp-new').value === 'abcdefgh1',
+    'reset form keeps the new password after a server rejection');
+  assert(w.document.getElementById('fp-confirm').value === 'abcdefgh1',
+    'reset form keeps the confirmation after a server rejection');
+  /* the draft must not leak either */
+  await w.eval("go('login')");
+  await sleep(100);
+  assert(w.eval("!(state.forgot && state.forgot.draft)"),
+    'reset draft is dropped after leaving the forgot-password screen');
+
   /* --- student login --- */
   w.document.getElementById('li-email').value = em1;
   w.document.getElementById('li-pass').value = 'fix12345';

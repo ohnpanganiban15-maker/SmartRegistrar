@@ -20,7 +20,10 @@ const state = {
   unread: 0,
   pendingReq: 0,
   sidebarOpen: false,
-  otpPurpose: '', otpEmail: '', devOtp: ''
+  otpPurpose: '', otpEmail: '', devOtp: '',
+  /* the code typed on the OTP screen — kept across re-renders so a rejected
+     submission never erases what the user already entered */
+  otpCode: ''
 };
 
 const VIEWS = {
@@ -123,6 +126,9 @@ async function go(view, patch) {
   if (patch) Object.assign(state, patch);
   /* a remembered login address only matters while the user is on the login screen */
   if (view !== 'login' && state.form) delete state.form.li;
+  /* same rule for the typed OTP and the forgot-password draft */
+  if (view !== 'otp') state.otpCode = '';
+  if (view !== 'forgotPassword' && state.forgot) delete state.forgot.draft;
   state.view = view;
   state.error = '';
   state.loading = true;
@@ -145,8 +151,8 @@ function render() {
     return;
   }
   if (state.view === 'register') { app.innerHTML = viewRegister(); restoreFormValues(); return; }
-  if (state.view === 'otp') { app.innerHTML = viewOtp(); return; }
-  if (state.view === 'forgotPassword') { app.innerHTML = viewForgotPassword(); return; }
+  if (state.view === 'otp') { app.innerHTML = viewOtp(); restoreFormValues(); return; }
+  if (state.view === 'forgotPassword') { app.innerHTML = viewForgotPassword(); restoreFormValues(); return; }
 
   const viewFn = VIEWS[state.view] || VIEWS.dashboard;
   let content;
@@ -212,6 +218,15 @@ function restoreFormValues() {
     _setFormVal('cp-current', f.cp.currentPassword);
     _setFormVal('cp-new', f.cp.newPassword);
     _setFormVal('cp-confirm', f.cp.confirm);
+  }
+  /* a rejected OTP submission must not erase the code already typed */
+  if (state.view === 'otp' && state.otpCode) _setFormVal('otp-code', state.otpCode);
+  /* ...nor may a failed password reset wipe the code and the two new passwords */
+  if (state.view === 'forgotPassword' && state.forgot && state.forgot.draft) {
+    const d = state.forgot.draft;
+    _setFormVal('fp-otp', d.otp);
+    _setFormVal('fp-new', d.newPassword);
+    _setFormVal('fp-confirm', d.confirm);
   }
 }
 
@@ -539,13 +554,16 @@ async function doVerifyRegisterOtp(e) {
   e.preventDefault();
   state.error = '';
   const code = document.getElementById('otp-code').value.trim();
-  if (code.length !== 6) { state.error = 'Enter the 6-digit code'; return render(); }
+  /* keep whatever was typed so a rejection doesn't clear the field */
+  const keepOtp = () => { state.otpCode = code; };
+  if (code.length !== 6) { keepOtp(); state.error = 'Enter the 6-digit code'; return render(); }
   try {
     await Api.post('/api/auth/register/verify-otp', { email: state.otpEmail, otp: code });
     toast('Account created — you can now sign in.');
-    state.error = ''; state.otpPurpose = ''; state.otpEmail = ''; state.devOtp = '';
+    state.error = ''; state.otpPurpose = ''; state.otpEmail = ''; state.devOtp = ''; state.otpCode = '';
     go('login');
   } catch (err) {
+    keepOtp();
     state.error = err.message;
     render();
   }
@@ -582,14 +600,17 @@ async function doChangePasswordVerifyOtp(e) {
   e.preventDefault();
   state.error = '';
   const code = document.getElementById('otp-code').value.trim();
-  if (code.length !== 6) { state.error = 'Enter the 6-digit code'; return render(); }
+  /* keep whatever was typed so a rejection doesn't clear the field */
+  const keepOtp = () => { state.otpCode = code; };
+  if (code.length !== 6) { keepOtp(); state.error = 'Enter the 6-digit code'; return render(); }
   try {
     const data = await Api.post('/api/auth/change-password/verify-otp', { otp: code });
     if (data.token) Api.saveSession(data.token, state.me);
     toast('Password changed successfully.');
-    state.error = ''; state.otpPurpose = ''; state.otpEmail = ''; state.devOtp = '';
+    state.error = ''; state.otpPurpose = ''; state.otpEmail = ''; state.devOtp = ''; state.otpCode = '';
     go('profile');
   } catch (err) {
+    keepOtp();
     state.error = err.message;
     render();
   }
@@ -622,19 +643,22 @@ async function doForgotVerifyOtp(e) {
   const otp = document.getElementById('fp-otp').value.trim();
   const newPassword = document.getElementById('fp-new').value;
   const confirm = document.getElementById('fp-confirm').value;
+  /* keep everything typed so a rejected submission doesn't wipe the form */
+  const keepDraft = () => { if (state.forgot) state.forgot.draft = { otp, newPassword, confirm }; };
   if (!email) { state.error = 'Please request a code again.'; state.forgot = null; return go('login'); }
-  if (otp.length !== 6) { state.error = 'Enter the 6-digit code'; return render(); }
-  if (newPassword !== confirm) { state.error = 'Passwords do not match'; return render(); }
+  if (otp.length !== 6) { keepDraft(); state.error = 'Enter the 6-digit code'; return render(); }
+  if (newPassword !== confirm) { keepDraft(); state.error = 'Passwords do not match'; return render(); }
   /* hindi alam ng client kung admin o student ang account — 12 ang maximum,
      ang server ang magpapatupad ng tamang limit ayon sa role */
   const weak = passwordIssue(newPassword, ADMIN_MAX_PW);
-  if (weak) { state.error = weak; return render(); }
+  if (weak) { keepDraft(); state.error = weak; return render(); }
   try {
     const data = await Api.post('/api/auth/forgot-password/verify-otp', { email, otp, newPassword });
     toast((data && data.message) || 'Password reset — you can now sign in.');
     state.error = ''; state.devOtp = ''; state.forgot = null;
     go('login');
   } catch (err) {
+    keepDraft();
     state.error = err.message;
     render();
   }
