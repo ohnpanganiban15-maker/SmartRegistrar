@@ -425,6 +425,14 @@ async function call(method, path, token, body) {
     'app version reports Gmail mail status as a boolean');
   assert(r.data.mail === false,
     'local test run has no Gmail configured (OTP stays in DEV mode)');
+  /* per-variable presence, never the values themselves */
+  assert(r.data.gmail && typeof r.data.gmail.user === 'boolean' &&
+    typeof r.data.gmail.appPassword === 'boolean',
+    'version reports Gmail variable presence as booleans');
+  assert(r.data.gmail.user === false && r.data.gmail.appPassword === false,
+    'local .env leaves both Gmail variables empty');
+  assert(!('gmail_keys' in r.data),
+    'no environment enumeration field on the public endpoint');
 
   /* --- Google sign-in fully removed: no config leak, no auth endpoints --- */
   r = await call('GET', '/api/app/config');

@@ -15,12 +15,21 @@ const router = express.Router();
 /* GET /api/app/version — public: which build is live (update notifier).
    Clients compare this against the build they loaded; a mismatch means
    a new deploy happened and the "update available" banner is shown.
+
    `mail` reports whether Gmail SMTP is configured — a boolean only, so no
-   secret ever leaves the server. mail:false means OTP runs in DEV MODE. */
+   secret ever leaves the server. mail:false means OTP runs in DEV MODE.
+
+   `gmail` reports, per expected variable, whether a NON-EMPTY value is
+   present. That is enough to pinpoint a missing or mistyped entry (e.g.
+   GMAILUSER) without ever enumerating the environment or exposing a value. */
 router.get('/app/version', (req, res) => {
   res.json({
     version, updated_at: bootedAt, name: 'CDLSHS Smart Registrar',
-    mail: isConfigured()
+    mail: isConfigured(),
+    gmail: {
+      user: !!process.env.GMAIL_USER,
+      appPassword: !!process.env.GMAIL_APP_PASSWORD
+    }
   });
 });
 
