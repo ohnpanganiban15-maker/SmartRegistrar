@@ -8,14 +8,20 @@ const path = require('path');
 const { q, db, logActivity } = require('../db');
 const { requireAuth, requireAdmin } = require('../auth');
 const { version, bootedAt } = require('../version');
+const { isConfigured } = require('../mailer');
 
 const router = express.Router();
 
 /* GET /api/app/version — public: which build is live (update notifier).
    Clients compare this against the build they loaded; a mismatch means
-   a new deploy happened and the "update available" banner is shown. */
+   a new deploy happened and the "update available" banner is shown.
+   `mail` reports whether Gmail SMTP is configured — a boolean only, so no
+   secret ever leaves the server. mail:false means OTP runs in DEV MODE. */
 router.get('/app/version', (req, res) => {
-  res.json({ version, updated_at: bootedAt, name: 'CDLSHS Smart Registrar' });
+  res.json({
+    version, updated_at: bootedAt, name: 'CDLSHS Smart Registrar',
+    mail: isConfigured()
+  });
 });
 
 /* GET /api/dashboard/stats — numbers for dashboard cards */

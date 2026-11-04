@@ -419,6 +419,12 @@ async function call(method, path, token, body) {
   r = await call('GET', '/api/app/version');
   assert(r.status === 200 && typeof r.data.version === 'string' && r.data.version.length > 0 &&
     r.data.updated_at, 'app version endpoint (public)');
+  /* `mail` is a plain boolean — proves whether Gmail SMTP is configured
+     without ever exposing a credential. Local runs are DEV mode. */
+  assert(typeof r.data.mail === 'boolean',
+    'app version reports Gmail mail status as a boolean');
+  assert(r.data.mail === false,
+    'local test run has no Gmail configured (OTP stays in DEV mode)');
 
   /* --- Google sign-in fully removed: no config leak, no auth endpoints --- */
   r = await call('GET', '/api/app/config');
