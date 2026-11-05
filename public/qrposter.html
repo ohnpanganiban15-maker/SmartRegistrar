@@ -212,7 +212,7 @@
 
       <div class="scan-cue"><span class="hand">&#128241;</span> Point your camera at the code</div>
 
-      <div class="qr-url">https://smart-registrar.onrender.com/<br>downloads/SmartRegistrar.apk</div>
+      <div class="qr-url">https://smart-registrar.onrender.com/<br>download.html</div>
 
       <div class="specs">
         <div class="spec"><b>Free</b><small>Price</small></div>
@@ -243,7 +243,8 @@
         <li>
           <b>Scan the QR code</b>
           <span>Open your phone's <b>Camera</b> app and point it at the code on the left &mdash;
-          a download link pops up. <b>Tap it.</b></span>
+          the <b>download page</b> opens, carrying this same guide.
+          <b>Tap &darr; Download the APK.</b></span>
         </li>
         <li>
           <b>Allow the download</b>
@@ -298,17 +299,19 @@
 <script src="js/vendor/qrcode.min.js"></script>
 <script>
   (function () {
-    var APK = 'https://smart-registrar.onrender.com/downloads/SmartRegistrar.apk';
+    /* scanning opens the download page: the APK button AND the full
+       step-by-step install guide live there, instead of a bare file link */
+    var PAGE = 'https://smart-registrar.onrender.com/download.html';
     var box = document.getElementById('qr');
     try {
       new QRCode(box, {
-        text: APK,
+        text: PAGE,
         width: 430, height: 430,
         colorDark: '#0E1B2C', colorLight: '#ffffff',
         correctLevel: QRCode.CorrectLevel.M
       });
     } catch (e) {
-      box.innerHTML = '<div style="font:800 24px monospace;padding:30px;word-break:break-all">' + APK + '</div>';
+      box.innerHTML = '<div style="font:800 24px monospace;padding:30px;word-break:break-all">' + PAGE + '</div>';
     }
 
     /* live version badge */
