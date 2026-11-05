@@ -133,6 +133,8 @@ async function go(view, patch) {
   state.error = '';
   state.loading = true;
   state.sidebarOpen = false;
+  /* arm the inactivity timer the first time we land somewhere with a session */
+  if (state.me && !_idleTimer) resetIdleTimer();
   window.scrollTo(0, 0);
   render();
   try { await loadView(view); } catch (e) { state.error = e.message; }
@@ -689,6 +691,7 @@ async function askLogout() {
 function logout() {
   Api.clearSession();
   state.me = null;
+  resetIdleTimer();   /* no session left to guard */
   state.unread = 0;
   state.book = { service: '', date: '', slotId: null, startTime: '', purpose: '' };
   state.confirmed = null;
@@ -1438,5 +1441,38 @@ const AppUpdate = {
 setInterval(() => { AppUpdate.check(); }, 60000);
 document.addEventListener('visibilitychange', () => { if (!document.hidden) AppUpdate.check(); });
 AppUpdate.check();
+
+/* ---------- idle auto-logout ----------
+   15 minutes without keyboard, pointer, or scroll activity signs the user
+   out, so an unattended device does not stay logged in. The timer only runs
+   while there is a session to protect, and any real interaction restarts it. */
+let IDLE_MS = 15 * 60000;
+let _idleTimer = null;
+let _idleLast = 0;
+
+function resetIdleTimer() {
+  if (_idleTimer) { clearTimeout(_idleTimer); _idleTimer = null; }
+  if (!state.me) return;                 /* nothing to guard while signed out */
+  _idleTimer = setTimeout(idleLogout, IDLE_MS);
+}
+
+function idleLogout() {
+  if (!state.me) return;
+  const mins = Math.max(1, Math.round(IDLE_MS / 60000));
+  logout();
+  toast('Signed out after ' + mins + ' minute' + (mins === 1 ? '' : 's') +
+        ' of inactivity — please sign in again.', 'info');
+}
+
+/* pointer / keyboard / scroll activity counts as being present */
+function _idleActivity() {
+  const now = Date.now();
+  if (now - _idleLast < 1000) return;     /* throttle: at most once a second */
+  _idleLast = now;
+  resetIdleTimer();
+}
+
+['mousemove', 'mousedown', 'keydown', 'touchstart', 'wheel', 'scroll']
+  .forEach(ev => window.addEventListener(ev, _idleActivity, { passive: true }));
 
 boot();

@@ -416,6 +416,30 @@ const evalA = expr => w.eval(expr);
   evalA(`AppUpdate.dismiss()`);
   assert(w.document.getElementById('update-bar') === null, 'update banner dismissable');
 
+  /* --- idle auto-logout --- */
+  assert(evalA('IDLE_MS') === 15 * 60000, 'idle timeout defaults to 15 minutes');
+  assert(evalA('_idleTimer') === null, 'no idle timer while signed out');
+  w.document.getElementById('li-email').value = em1;
+  w.document.getElementById('li-pass').value = 'fix12345';
+  await w.doLogin({ preventDefault: () => {} });
+  await sleep(250);
+  assert(evalA('!!state.me'), 'idle test: signed in');
+  assert(evalA('_idleTimer') !== null, 'idle timer arms once a session exists');
+  /* shrink the window and let it lapse */
+  evalA('IDLE_MS = 250; resetIdleTimer()');
+  await sleep(800);
+  assert(w.document.getElementById('li-email') !== null,
+    'idle auto-logout returns to the login screen');
+  assert(evalA('state.me === null'), 'idle auto-logout clears the session');
+  assert(evalA('_idleTimer') === null, 'idle timer disarmed after signing out');
+  {
+    const t = w.document.getElementById('toast-root');
+    assert(!!t && /inactivity/i.test(t.textContent),
+      'idle auto-logout explains why the user was signed out');
+  }
+  /* restore the real window so nothing else fires early */
+  evalA('IDLE_MS = 15 * 60000');
+
   /* leave the database example-free for the user */
   purge();
 
