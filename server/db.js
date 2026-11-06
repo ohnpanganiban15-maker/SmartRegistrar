@@ -85,6 +85,7 @@ CREATE TABLE IF NOT EXISTS document_requests (
   quantity    INTEGER NOT NULL DEFAULT 1 CHECK(quantity > 0),
   purpose     TEXT NOT NULL DEFAULT '',
   pickup_date TEXT NOT NULL DEFAULT '',
+  pickup_time TEXT NOT NULL DEFAULT '',
   notes       TEXT NOT NULL DEFAULT '',
   status      TEXT NOT NULL DEFAULT 'Pending'
               CHECK(status IN ('Pending','Processing','Ready for Pickup','Completed','Rejected','Cancelled')),
@@ -178,6 +179,7 @@ ensureColumn('users', 'failed_attempts INTEGER NOT NULL DEFAULT 0');
 ensureColumn('users', "locked_until TEXT NOT NULL DEFAULT ''");
 ensureColumn('users', 'token_version INTEGER NOT NULL DEFAULT 0');
 ensureColumn('students', "profile_photo TEXT NOT NULL DEFAULT ''");
+ensureColumn('document_requests', "pickup_time TEXT NOT NULL DEFAULT ''");
 
 /* ---- ensure required document types exist (safe on old + fresh DBs) ---- */
 const insertDocType = db.prepare('INSERT OR IGNORE INTO document_types (name) VALUES (?)');

@@ -661,6 +661,13 @@ html[data-theme="dark"] .chat-item .subj { color:var(--primary-deep); }
   background:var(--danger-pale); border:1px solid var(--danger); color:var(--danger);
   border-radius:var(--radius-sm); padding:12px 15px; font-size:13.5px; margin-bottom:14px; font-weight:650;
 }
+/* "ready for pickup" banner shown to the student with the claim date + time */
+.pickup-note {
+  background:var(--success-pale); border:1px solid var(--success); color:var(--success);
+  border-radius:var(--radius-sm); padding:11px 14px; font-size:13.5px; margin-top:10px;
+  display:flex; flex-direction:column; gap:4px;
+}
+.pickup-note .muted { color:var(--muted); }
 
 /* ---------- 17. Modal + toast ---------- */
 .modal-backdrop {

@@ -7,6 +7,27 @@ const { requireAuth, validateBody } = require('../auth');
 
 const router = express.Router();
 
+/* small human-readable helpers for notifications */
+function longDate(iso) {
+  const d = new Date(String(iso) + 'T00:00:00');
+  if (isNaN(d)) return iso;
+  return d.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+}
+function clock(t) {
+  const m = String(t || '').match(/^(\d{1,2}):(\d{2})/);
+  if (!m) return '';
+  let h = parseInt(m[1], 10);
+  const ap = h >= 12 ? 'PM' : 'AM';
+  h = h % 12; if (h === 0) h = 12;
+  return h + ':' + m[2] + ' ' + ap;
+}
+function validDate(v) { return /^\d{4}-\d{2}-\d{2}$/.test(v); }
+function validTime(v) { return /^([01]?\d|2[0-3]):[0-5]\d$/.test(v); }
+function whenText(date, time) {
+  if (!date) return '';
+  return 'on ' + longDate(date) + (time ? ' at ' + clock(time) : '');
+}
+
 function notify(userId, title, body, kind) {
   q.run('INSERT INTO notifications (user_id, title, body, kind) VALUES (?,?,?,?)',
     userId, title, body, kind || 'request');
@@ -66,12 +87,14 @@ router.get('/pending-count', requireAuth, (req, res) => {
   res.json({ count: q.get("SELECT COUNT(*) c FROM document_requests WHERE status='Pending'").c });
 });
 
-/* PUT /api/requests/:id/status — admin updates, or student cancels own */
+/* PUT /api/requests/:id/status — admin updates, or student cancels own
+   Admin may also hand over the pickup date + time in this same call
+   (the UI collects them the moment "Ready for Pickup" is chosen). */
 router.put('/:id/status', requireAuth, (req, res) => {
   const reqRow = q.get('SELECT * FROM document_requests WHERE id=?', req.params.id);
   if (!reqRow) return res.status(404).json({ error: 'Request not found' });
 
-  const { status, reason } = req.body || {};
+  const { status, reason, pickupDate, pickupTime } = req.body || {};
   const allowed = ['Pending', 'Processing', 'Ready for Pickup', 'Completed', 'Rejected', 'Cancelled'];
   if (!allowed.includes(status)) return res.status(400).json({ error: 'Invalid status' });
 
@@ -83,7 +106,23 @@ router.put('/:id/status', requireAuth, (req, res) => {
     }
   }
 
-  q.run('UPDATE document_requests SET status=?, updated_at=datetime(\'now\') WHERE id=?', status, reqRow.id);
+  /* pickup schedule may ride along with the status change (admin only) */
+  let date = reqRow.pickup_date || '';
+  let time = reqRow.pickup_time || '';
+  if (req.user.role === 'admin' &&
+      (pickupDate !== undefined || pickupTime !== undefined)) {
+    if (pickupDate !== undefined) {
+      date = String(pickupDate == null ? '' : pickupDate).trim();
+      if (date && !validDate(date)) return res.status(400).json({ error: 'Invalid pickup date format' });
+    }
+    if (pickupTime !== undefined) {
+      time = String(pickupTime == null ? '' : pickupTime).trim();
+      if (time && !validTime(time)) return res.status(400).json({ error: 'Invalid pickup time format' });
+    }
+  }
+
+  q.run(`UPDATE document_requests SET status=?, pickup_date=?, pickup_time=?,
+         updated_at=datetime('now') WHERE id=?`, status, date, time, reqRow.id);
 
   const studentUser = q.get('SELECT id FROM users WHERE student_id=?', reqRow.student_id);
   const titles = {
@@ -92,34 +131,47 @@ router.put('/:id/status', requireAuth, (req, res) => {
     Pending: 'Request Reopened'
   };
   if (studentUser) {
-    notify(studentUser.id, titles[status] || 'Request Updated',
-      reqRow.ref + ' (' + reqRow.doc_type + ') → ' + status + (reason ? '. Reason: ' + reason : '.'));
+    let body = reqRow.ref + ' (' + reqRow.doc_type + ') → ' + status + (reason ? '. Reason: ' + reason : '.');
+    if (status === 'Ready for Pickup' && date) {
+      body += ' You can claim it ' + whenText(date, time) + '.';
+    }
+    notify(studentUser.id, titles[status] || 'Request Updated', body);
   }
   logActivity(req.user.id, req.user.name, 'REQUEST_' + status.toUpperCase().replace(/ /g, '_'), reqRow.ref);
-  res.json({ message: 'Request marked as ' + status });
+  res.json({ message: 'Request marked as ' + status, pickup_date: date, pickup_time: time });
 });
 
-/* PUT /api/requests/:id/pickup — admin sets the date the document can be claimed */
+/* PUT /api/requests/:id/pickup — admin sets the date + time the document
+   can be claimed (used when editing an already-scheduled pickup) */
 router.put('/:id/pickup', requireAuth, (req, res) => {
   if (req.user.role !== 'admin') {
-    return res.status(403).json({ error: 'Only the registrar can set the pickup date' });
+    return res.status(403).json({ error: 'Only the registrar can set the pickup schedule' });
   }
   const reqRow = q.get('SELECT * FROM document_requests WHERE id=?', req.params.id);
   if (!reqRow) return res.status(404).json({ error: 'Request not found' });
-  const date = String((req.body || {}).date || '').trim();
-  if (date && !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+  const b = req.body || {};
+  const date = String(b.date || '').trim();
+  const time = String(b.time || '').trim();
+  if (date && !validDate(date)) {
     return res.status(400).json({ error: 'Invalid date format' });
   }
-  q.run('UPDATE document_requests SET pickup_date=?, updated_at=datetime(\'now\') WHERE id=?', date, reqRow.id);
-  if (date && date !== (reqRow.pickup_date || '')) {
+  if (time && !validTime(time)) {
+    return res.status(400).json({ error: 'Invalid time format' });
+  }
+  q.run(`UPDATE document_requests SET pickup_date=?, pickup_time=?,
+         updated_at=datetime('now') WHERE id=?`, date, time, reqRow.id);
+  const changed = (date && date !== (reqRow.pickup_date || '')) ||
+                  (time && time !== (reqRow.pickup_time || ''));
+  if (changed) {
     const studentUser = q.get('SELECT id FROM users WHERE student_id=?', reqRow.student_id);
     if (studentUser) {
-      notify(studentUser.id, 'Pickup Date Set',
-        reqRow.ref + ' (' + reqRow.doc_type + ') can be claimed on ' + date + '.', 'request');
+      notify(studentUser.id, 'Pickup Schedule Set',
+        reqRow.ref + ' (' + reqRow.doc_type + ') can be claimed ' + whenText(date, time) + '.', 'request');
     }
   }
-  logActivity(req.user.id, req.user.name, 'SET_PICKUP_DATE', reqRow.ref + ' ' + (date || '(none)'));
-  res.json({ message: 'Pickup date saved', pickup_date: date });
+  logActivity(req.user.id, req.user.name, 'SET_PICKUP_SCHEDULE',
+    reqRow.ref + ' ' + (date || '(none)') + (time ? ' ' + time : ''));
+  res.json({ message: 'Pickup schedule saved', pickup_date: date, pickup_time: time });
 });
 
 module.exports = router;

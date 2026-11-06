@@ -333,6 +333,10 @@ const evalA = expr => w.eval(expr);
   const apptF = await w.eval(`Api.post('/api/appointments',{slotId:${freeSlotF.id},service:'Certificate of Enrollment',purpose:'Frontend QR test'})`);
   assert(!!apptF && /^APT-\d{4}$/.test(apptF.ref), 'fixture appointment booked → ' + (apptF && apptF.ref));
 
+  /* a document request the admin will schedule a pickup for */
+  const reqF = await w.eval(`Api.post('/api/requests',{docType:'Form 137',quantity:1,purpose:'Pickup schedule test'})`);
+  assert(!!reqF && /^REQ-\d{4}$/.test(reqF.ref), 'fixture document request created → ' + (reqF && reqF.ref));
+
   /* --- logout / admin login --- */
   w.eval(`logout()`);
   await sleep(100);
@@ -391,6 +395,83 @@ const evalA = expr => w.eval(expr);
     $app().includes('Close whole day'),
     'pickup schedule management UI present');
 
+  /* --- admin: "Ready for Pickup" must collect date + time --- */
+  const isoPlus = n => {
+    const d = new Date(); d.setDate(d.getDate() + n);
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') +
+           '-' + String(d.getDate()).padStart(2, '0');
+  };
+  const day3 = isoPlus(3), day5 = isoPlus(5);
+  const rowOf = async id => (await w.eval(`Api.get('/api/requests')`)).find(x => x.id === id);
+
+  await w.eval(`go('adminRequests')`);
+  await sleep(250);
+  assert($app().includes('editPickup'), 'admin requests table offers a pickup schedule cell');
+  evalA(`setReqStatus(${reqF.id}, 'Ready for Pickup')`);
+  await sleep(60);
+  assert(w.document.getElementById('pk-date') !== null,
+    'choosing Ready for Pickup opens the pickup scheduler');
+  assert(w.document.getElementById('pk-time') !== null,
+    'the scheduler also asks for a pickup time');
+  /* both fields are required */
+  w.document.getElementById('pk-date').value = '';
+  evalA(`window.__pickupSubmit()`);
+  await sleep(40);
+  assert(w.document.getElementById('pk-date') !== null,
+    'an empty pickup date is refused — scheduler stays open');
+  assert(/date/i.test(w.document.getElementById('pk-hint').textContent),
+    'the scheduler explains the date is required');
+  w.document.getElementById('pk-date').value = day3;
+  w.document.getElementById('pk-time').value = '';
+  evalA(`window.__pickupSubmit()`);
+  await sleep(40);
+  assert(w.document.getElementById('pk-time') !== null,
+    'an empty pickup time is refused — scheduler stays open');
+  /* supply both → saved */
+  w.document.getElementById('pk-time').value = '09:30';
+  evalA(`window.__pickupSubmit()`);
+  await sleep(500);
+  assert(w.document.getElementById('pk-date') === null,
+    'scheduler closes once date + time are supplied');
+  {
+    const row = await rowOf(reqF.id);
+    assert(!!row && row.status === 'Ready for Pickup', 'request marked Ready for Pickup');
+    assert(!!row && row.pickup_date === day3 && row.pickup_time === '09:30',
+      'pickup date + time stored on the request');
+    assert($app().includes('9:30 AM'), 'admin table shows the claim time in 12-hour form');
+  }
+  /* cancelling the scheduler must leave the status untouched */
+  evalA(`setReqStatus(${reqF.id}, 'Processing')`);
+  await sleep(300);
+  evalA(`setReqStatus(${reqF.id}, 'Ready for Pickup')`);
+  await sleep(60);
+  assert(w.document.getElementById('pk-date') !== null, 'scheduler reopens for another change');
+  evalA(`closeModal()`);
+  await sleep(60);
+  assert((await rowOf(reqF.id)).status === 'Processing', 'closing the scheduler cancels the status change');
+  /* edit the schedule from the table without touching the status */
+  evalA(`editPickup(${reqF.id})`);
+  await sleep(60);
+  assert(w.document.getElementById('pk-date') !== null, 'table pickup cell reopens the scheduler');
+  w.document.getElementById('pk-date').value = day5;
+  w.document.getElementById('pk-time').value = '14:00';
+  evalA(`window.__pickupSubmit()`);
+  await sleep(500);
+  {
+    const row3 = await rowOf(reqF.id);
+    assert(!!row3 && row3.pickup_time === '14:00', 'edited pickup time saved');
+    assert(!!row3 && row3.status === 'Processing', 'editing the schedule keeps the status');
+  }
+  /* finish the flow: mark it ready carrying the edited schedule */
+  evalA(`setReqStatus(${reqF.id}, 'Ready for Pickup')`);
+  await sleep(60);
+  w.document.getElementById('pk-date').value = day5;
+  w.document.getElementById('pk-time').value = '14:00';
+  evalA(`window.__pickupSubmit()`);
+  await sleep(500);
+  assert((await rowOf(reqF.id)).status === 'Ready for Pickup',
+    'request finally marked ready with the edited schedule');
+
   /* --- theme toggle + persistence --- */
   evalA(`toggleTheme()`);
   await sleep(50);
@@ -404,6 +485,26 @@ const evalA = expr => w.eval(expr);
   w.eval(`logout()`);
   await sleep(100);
   assert(w.document.getElementById('li-email') !== null, 'logout returns to login screen');
+
+  /* --- student sees exactly WHEN the admin said the document can be claimed --- */
+  w.document.getElementById('li-email').value = em1;
+  w.document.getElementById('li-pass').value = 'fix12345';
+  await w.doLogin({ preventDefault: () => {} });
+  await sleep(300);
+  await w.eval(`go('myRequests')`);
+  await sleep(250);
+  {
+    const note = w.document.querySelector('.pickup-note');
+    assert(!!note, 'student sees a ready-for-pickup note on the request');
+    const wantDate = evalA(`fmtDate('${day5}')`);
+    const wantTime = evalA(`fmtTime('14:00')`);
+    assert(!!note && note.textContent.includes(wantDate),
+      'note shows the claim date (' + wantDate + ')');
+    assert(!!note && note.textContent.includes(wantTime),
+      'note shows the claim time (' + wantTime + ')');
+  }
+  w.eval(`logout()`);
+  await sleep(120);
 
   /* --- app update notifier (banner shown when server build differs) --- */
   assert(evalA(`typeof AppUpdate`) === 'object', 'AppUpdate notifier present');

@@ -148,6 +148,38 @@ async function call(method, path, token, body) {
   r = await call('GET', '/api/notifications', student);
   assert(r.data.some(n => n.title.includes('Ready for Pickup')), 'ready-for-pickup notification');
 
+  /* --- pickup date + time (admin supplies both) --- */
+  r = await call('PUT', `/api/requests/${reqId}/pickup`, admin, { date: '2026-10-20', time: '99:99' });
+  assert(r.status === 400, 'invalid pickup time rejected');
+  r = await call('PUT', `/api/requests/${reqId}/pickup`, admin, { date: '2026-10-21', time: '14:30' });
+  assert(r.status === 200 && r.data.pickup_time === '14:30', 'admin sets the pickup time');
+  r = await call('GET', '/api/requests', admin);
+  assert(r.data.some(x => x.id === reqId && x.pickup_time === '14:30'), 'pickup time persisted on the request');
+  r = await call('PUT', `/api/requests/${reqId}/status`, admin, { status: 'Processing' });
+  assert(r.status === 200, 'request moved back to Processing');
+  r = await call('PUT', `/api/requests/${reqId}/status`, admin,
+    { status: 'Ready for Pickup', pickupDate: '2026-10-22', pickupTime: '08:45' });
+  assert(r.status === 200 && r.data.pickup_date === '2026-10-22' && r.data.pickup_time === '08:45',
+    'status change carries pickup date + time in one call');
+  r = await call('PUT', `/api/requests/${reqId}/status`, admin, { status: 'Processing', pickupDate: 'nope' });
+  assert(r.status === 400, 'bad pickup date inside a status change rejected');
+  r = await call('PUT', `/api/requests/${reqId}/status`, admin, { status: 'Processing', pickupTime: '25:00' });
+  assert(r.status === 400, 'bad pickup time inside a status change rejected');
+  r = await call('PUT', `/api/requests/${reqId}/status`, student,
+    { status: 'Ready for Pickup', pickupDate: '2026-10-23', pickupTime: '10:00' });
+  assert(r.status === 403, 'student cannot set a pickup schedule');
+  r = await call('PUT', `/api/requests/${reqId}/status`, admin,
+    { status: 'Ready for Pickup', pickupDate: '2026-10-22', pickupTime: '08:45' });
+  assert(r.status === 200, 'request scheduled for pickup again');
+  r = await call('GET', '/api/notifications', student);
+  assert(r.data.some(n => /claim it on/i.test(n.body)),
+    'notification tells the student when the document can be claimed');
+  r = await call('GET', '/api/qr/lookup?code=' + reqRef, student);
+  assert(r.status === 200 && r.data.time === '08:45', 'QR lookup returns the pickup time');
+  r = await call('PUT', `/api/requests/${reqId}/pickup`, admin, { date: '2026-10-24', time: '07:15' });
+  assert(r.status === 200 && r.data.pickup_date === '2026-10-24' && r.data.pickup_time === '07:15',
+    'admin edits the pickup schedule without touching the status');
+
   /* --- students CRUD (admin) --- */
   r = await call('GET', '/api/students?search=' + stuNum, admin);
   assert(r.status === 200 && r.data.length >= 1, 'admin search students');
@@ -337,6 +369,7 @@ async function call(method, path, token, body) {
   assert(r.status === 200 && r.text.includes('student_number'), 'admin exports students CSV');
   r = await call('GET', '/api/export/requests', admin);
   assert(r.status === 200 && r.text.includes('pickup_date'), 'admin exports requests CSV');
+  assert(r.text.includes('pickup_time'), 'admin CSV export includes the pickup time');
   r = await call('GET', '/api/export/logs', admin);
   assert(r.status === 200 && r.text.includes('action'), 'admin exports activity logs CSV');
   r = await call('GET', '/api/export/nope', admin);

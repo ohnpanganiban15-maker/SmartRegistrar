@@ -101,7 +101,7 @@ router.get('/logs', requireAuth, requireAdmin, (req, res) => {
 /* ---- CSV export (admin) ---- */
 const EXPORTS = {
   students: `SELECT student_number, first_name, middle_name, last_name, grade_level, strand, contact, email, status, created_at FROM students ORDER BY id`,
-  requests: `SELECT ref, student_name, doc_type, quantity, purpose, pickup_date, notes, status, created_at, updated_at FROM document_requests ORDER BY id`,
+  requests: `SELECT ref, student_name, doc_type, quantity, purpose, pickup_date, pickup_time, notes, status, created_at, updated_at FROM document_requests ORDER BY id`,
   logs: `SELECT user_name, action, details, created_at FROM activity_logs ORDER BY id DESC`
 };
 function csvCell(v) {
@@ -156,7 +156,7 @@ router.get('/qr/lookup', requireAuth, (req, res) => {
     return res.json({
       type: 'document_request', ref: r.ref, name: r.student_name, service: r.doc_type,
       quantity: r.quantity, purpose: r.purpose || '',
-      date: r.pickup_date || r.created_at.slice(0, 10), time: '', status: r.status
+      date: r.pickup_date || r.created_at.slice(0, 10), time: r.pickup_time || '', status: r.status
     });
   }
   if (code.startsWith('STU-')) {

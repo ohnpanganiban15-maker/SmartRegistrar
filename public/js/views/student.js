@@ -441,7 +441,14 @@ function viewMyRequests() {
         <span class="muted small">${fmtDateShort(String(r.created_at).slice(0, 10))}</span>
       </div>
       <div class="mt-8"><b>${esc(r.doc_type)}</b> × ${r.quantity}</div>
-      <div class="muted small">Purpose: ${esc(r.purpose || '—')}${r.pickup_date ? ' · Pickup: ' + fmtDateShort(r.pickup_date) : ''}</div>
+      <div class="muted small">Purpose: ${esc(r.purpose || '—')}</div>
+      ${r.status === 'Ready for Pickup' && r.pickup_date ? `
+        <div class="pickup-note">
+          <div>📦 <b>Ready for pickup — claim on ${esc(fmtDate(r.pickup_date))}${r.pickup_time ? ' at ' + esc(fmtTime(r.pickup_time)) : ''}</b></div>
+          <div class="muted small">Bring a valid ID, or show your QR at the registrar counter.</div>
+        </div>` : ''}
+      ${r.pickup_date && r.status !== 'Ready for Pickup' ? `
+        <div class="muted small">Pickup: ${esc(fmtDateShort(r.pickup_date))}${r.pickup_time ? ' at ' + esc(fmtTime(r.pickup_time)) : ''}</div>` : ''}
       ${r.notes ? `<div class="small mt-8">Notes: ${esc(r.notes)}</div>` : ''}
       <div class="flex mt-14">
         <button class="btn btn-sm btn-primary" onclick="Chat.openThread(${r.id})">💬 Chat</button>

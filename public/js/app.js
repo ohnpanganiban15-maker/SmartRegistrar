@@ -1082,9 +1082,84 @@ async function setReqStatus(id, status) {
     const ok = await confirmDlg('Mark this request as ' + status + '? The student will be notified.', 'Yes');
     if (!ok) return;
   }
+  /* choosing "Ready for Pickup" always asks WHEN the student can claim it */
+  let when = null;
+  if (status === 'Ready for Pickup') {
+    when = await askPickup(id);
+    if (!when) return;                     /* cancelled — nothing changes */
+  }
   try {
-    await Api.put('/api/requests/' + id + '/status', { status });
-    toast('Request marked as ' + status + '.');
+    const body = { status };
+    if (when) { body.pickupDate = when.date; body.pickupTime = when.time; }
+    await Api.put('/api/requests/' + id + '/status', body);
+    toast(when
+      ? 'Ready for Pickup — claim on ' + fmtDateShort(when.date) + ' at ' + fmtTime(when.time) + '.'
+      : 'Request marked as ' + status + '.');
+    await loadView(state.view);
+    await updateUnread();
+    render();
+  } catch (err) { toast(err.message, 'error'); }
+}
+
+/* pickup scheduler modal — returns {date,time} or null when cancelled */
+function askPickup(id) {
+  return new Promise(resolve => {
+    const r = (state.requests || []).find(x => x.id === id) || {};
+    let settled = false;
+    const finish = v => {
+      if (settled) return;
+      settled = true;
+      window.__pickupFinish = null;
+      closeModal();
+      resolve(v);
+    };
+    window.__pickupFinish = finish;
+    openModal(
+      '<div class="modal-head">' +
+        '<div class="modal-title">📅 Set the pickup schedule</div>' +
+        '<button class="modal-x" onclick="closeModal()" aria-label="Close">&times;</button>' +
+      '</div>' +
+      '<div class="modal-body">' +
+        '<p class="muted">Tell <b>' + esc(r.student_name || 'the student') + '</b> when <b>' +
+          esc(r.ref || '') + '</b> — ' + esc(r.doc_type || 'document') +
+          ' — can be claimed. Both fields are required.</p>' +
+        '<div class="form-row">' +
+          '<div class="field"><label for="pk-date">Pickup date *</label>' +
+            '<input class="input" type="date" id="pk-date" min="' + todayISO() + '" value="' +
+            esc(r.pickup_date || '') + '"></div>' +
+          '<div class="field"><label for="pk-time">Pickup time *</label>' +
+            '<input class="input" type="time" id="pk-time" value="' +
+            esc(r.pickup_time || '08:00') + '"></div>' +
+        '</div>' +
+        '<div class="muted small" id="pk-hint">The student is notified with this date and time.</div>' +
+      '</div>' +
+      '<div class="modal-actions">' +
+        '<button class="btn btn-outline" onclick="window.__pickupFinish && window.__pickupFinish(null)">Cancel</button>' +
+        '<button class="btn btn-success" id="pk-save" onclick="window.__pickupSubmit()">Save schedule</button>' +
+      '</div>');
+    /* closing by backdrop / &times; counts as cancelling */
+    const origClose = window.closeModal;
+    window.closeModal = function () { origClose(); window.closeModal = origClose; finish(null); };
+  });
+}
+
+/* called by the modal's Save button */
+window.__pickupSubmit = function () {
+  const d = (document.getElementById('pk-date') || {}).value || '';
+  const t = (document.getElementById('pk-time') || {}).value || '';
+  const hint = document.getElementById('pk-hint');
+  if (!d) { if (hint) hint.textContent = '⚠ Please choose a pickup date.'; return; }
+  if (!t) { if (hint) hint.textContent = '⚠ Please choose a pickup time.'; return; }
+  if (window.__pickupFinish) window.__pickupFinish({ date: d, time: t });
+};
+
+/* edit an existing pickup schedule without changing the status */
+async function editPickup(id) {
+  const when = await askPickup(id);
+  if (!when) return;
+  try {
+    await Api.put('/api/requests/' + id + '/pickup', { date: when.date, time: when.time });
+    toast('Pickup schedule saved — ' + fmtDateShort(when.date) + ' at ' + fmtTime(when.time) + '.');
     await loadView(state.view);
     await updateUnread();
     render();
