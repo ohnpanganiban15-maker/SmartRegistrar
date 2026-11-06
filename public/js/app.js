@@ -1216,6 +1216,12 @@ async function lookupCode(codeOverride) {
   const out = document.getElementById('scan-result');
   try {
     const d = await Api.get('/api/qr/lookup?code=' + encodeURIComponent(code));
+    /* scanning a document request starts its 24-hour claim window */
+    let claim = null;
+    if (d.type === 'document_request' && d.id && d.status !== 'Completed') {
+      try { claim = await Api.post('/api/requests/' + d.id + '/claim', {}); } catch (e) { claim = null; }
+      if (claim && claim.started) toast('24-hour claim window started for ' + d.ref + '.');
+    }
     if (out) out.innerHTML = `
       <div class="panel mb-0" style="border-color:var(--primary);">
         <div class="flex-between">
@@ -1228,6 +1234,16 @@ async function lookupCode(codeOverride) {
         ${d.purpose ? `<div class="kv"><span class="k">Purpose</span><span class="v">${esc(d.purpose)}</span></div>` : ''}
         <div class="kv"><span class="k">Date</span><span class="v">${fmtDate(d.date)}</span></div>
         ${d.time && d.time !== 'x' ? `<div class="kv"><span class="k">Time</span><span class="v">${fmtTime(d.time) || esc(d.time)}</span></div>` : ''}
+        ${d.type === 'document_request' ? (
+          d.status === 'Completed'
+            ? `<div class="claim-note locked">🔒 <b>Completed</b> — the pickup schedule is locked and can no longer be edited.</div>`
+            : claim
+              ? `<div class="claim-note"><b>⏱ 24-hour claim window${claim.started ? ' started' : ' running'}</b>
+                  — auto-completes <b>${esc(claimDeadlineText(claim.claimed_at))}</b>
+                  <span class="muted small">(${esc(claimTimeLeft(claim.claimed_at))}). The registrar may still press
+                  <b>Completed</b> manually at any time.</span></div>`
+              : ''
+        ) : ''}
         <div class="muted small mt-8">Sensitive student details are hidden in QR lookups.</div>
       </div>`;
   } catch (err) {

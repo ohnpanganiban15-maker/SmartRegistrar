@@ -253,12 +253,19 @@ function viewAdminRequests() {
         <td data-label="Document">${esc(r.doc_type)} × ${r.quantity}
           <div class="muted small">${esc(r.purpose || '')}</div></td>
         <td data-label="Pickup">
-          <button class="btn btn-sm btn-ghost" onclick="editPickup(${r.id})"
-            title="Set or edit the pickup date and time">
-            ${r.pickup_date
-              ? esc(fmtDateShort(r.pickup_date)) + (r.pickup_time ? ' · ' + esc(fmtTime(r.pickup_time)) : '')
-              : '<span class="muted">+ Set</span>'}
-          </button>
+          ${r.status === 'Completed'
+            ? `<span class="pickup-locked" title="Completed — the pickup schedule can no longer be edited">🔒 ${r.pickup_date
+                ? esc(fmtDateShort(r.pickup_date)) + (r.pickup_time ? ' · ' + esc(fmtTime(r.pickup_time)) : '')
+                : '<span class="muted">Locked</span>'}</span>`
+            : `<button class="btn btn-sm btn-ghost" onclick="editPickup(${r.id})"
+                title="Set or edit the pickup date and time">
+                ${r.pickup_date
+                  ? esc(fmtDateShort(r.pickup_date)) + (r.pickup_time ? ' · ' + esc(fmtTime(r.pickup_time)) : '')
+                  : '<span class="muted">+ Set</span>'}
+              </button>
+              ${r.claimed_at ? `<div class="muted small claim-tick"
+                title="The request auto-completes 24 hours after it was scanned">⏱ auto-complete
+                ${esc(claimDeadlineText(r.claimed_at))} · ${esc(claimTimeLeft(r.claimed_at))}</div>` : ''}`}
         </td>
         <td data-label="Status">${stamp(r.status)}</td>
         <td class="cell-actions" data-label="">

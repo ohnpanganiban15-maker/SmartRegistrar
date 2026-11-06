@@ -156,7 +156,8 @@ router.get('/qr/lookup', requireAuth, (req, res) => {
     return res.json({
       type: 'document_request', ref: r.ref, name: r.student_name, service: r.doc_type,
       quantity: r.quantity, purpose: r.purpose || '',
-      date: r.pickup_date || r.created_at.slice(0, 10), time: r.pickup_time || '', status: r.status
+      date: r.pickup_date || r.created_at.slice(0, 10), time: r.pickup_time || '', status: r.status,
+      id: r.id, claimed_at: r.claimed_at || ''
     });
   }
   if (code.startsWith('STU-')) {

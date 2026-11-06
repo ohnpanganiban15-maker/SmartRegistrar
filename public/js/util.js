@@ -48,6 +48,37 @@ function initials(name) {
   return String(name || '?').split(/\s+/).map(w => w[0]).slice(0, 2).join('').toUpperCase();
 }
 
+/* ---- 24-hour claim window helpers --------------------------------
+   stamp = UTC "YYYY-MM-DD HH:MM:SS" written by the server when the
+   registrar scans the request's QR. The window ends 24h later. */
+function utcDate(stamp) {
+  const s = String(stamp || '').trim();
+  if (!s) return null;
+  const d = new Date(s.replace(' ', 'T') + (/[zZ]|[+-]\d{2}:?\d{2}$/.test(s) ? '' : 'Z'));
+  return isNaN(d) ? null : d;
+}
+function claimDeadline(stamp) {
+  const d = utcDate(stamp);
+  if (!d) return null;
+  d.setTime(d.getTime() + 24 * 3600 * 1000);
+  return d;
+}
+/* "Nov 8, 2026, 3:45 PM" (local time) */
+function claimDeadlineText(stamp) {
+  const d = claimDeadline(stamp);
+  return d ? d.toLocaleString('en-US',
+    { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' }) : '';
+}
+/* "23h 12m left" */
+function claimTimeLeft(stamp) {
+  const d = claimDeadline(stamp);
+  if (!d) return '';
+  const ms = d.getTime() - Date.now();
+  if (ms <= 0) return 'due now';
+  const h = Math.floor(ms / 3600000), m = Math.floor((ms % 3600000) / 60000);
+  return h + 'h ' + String(m).padStart(2, '0') + 'm left';
+}
+
 /* strong-password rules — shared with the server (server/routes/auth.js)
    Students: exactly 8. Admin: 8 to 12. */
 const ADMIN_MAX_PW = 12;

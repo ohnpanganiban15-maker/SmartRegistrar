@@ -109,6 +109,11 @@ router.put('/:id/status', requireAuth, (req, res) => {
   /* pickup schedule may ride along with the status change (admin only) */
   let date = reqRow.pickup_date || '';
   let time = reqRow.pickup_time || '';
+  /* once Completed the pickup schedule is frozen forever */
+  if (reqRow.status === 'Completed' &&
+      (pickupDate !== undefined || pickupTime !== undefined)) {
+    return res.status(409).json({ error: 'This request is Completed — the pickup schedule is locked' });
+  }
   if (req.user.role === 'admin' &&
       (pickupDate !== undefined || pickupTime !== undefined)) {
     if (pickupDate !== undefined) {
@@ -149,6 +154,9 @@ router.put('/:id/pickup', requireAuth, (req, res) => {
   }
   const reqRow = q.get('SELECT * FROM document_requests WHERE id=?', req.params.id);
   if (!reqRow) return res.status(404).json({ error: 'Request not found' });
+  if (reqRow.status === 'Completed') {
+    return res.status(409).json({ error: 'This request is Completed — the pickup schedule is locked' });
+  }
   const b = req.body || {};
   const date = String(b.date || '').trim();
   const time = String(b.time || '').trim();
@@ -172,6 +180,85 @@ router.put('/:id/pickup', requireAuth, (req, res) => {
   logActivity(req.user.id, req.user.name, 'SET_PICKUP_SCHEDULE',
     reqRow.ref + ' ' + (date || '(none)') + (time ? ' ' + time : ''));
   res.json({ message: 'Pickup schedule saved', pickup_date: date, pickup_time: time });
+});
+
+/* ---- 24-hour claim window ----------------------------------------
+   The moment the registrar scans a request's QR the clock starts:
+   24 hours later the request auto-completes. The admin may still
+   press "Completed" manually at any point before that. */
+function utcNow() {
+  return new Date().toISOString().slice(0, 19).replace('T', ' ');
+}
+function plus24h(stamp) {
+  const t = new Date(String(stamp).replace(' ', 'T') + 'Z').getTime() + 24 * 3600 * 1000;
+  if (isNaN(t)) return '';
+  return new Date(t).toISOString().slice(0, 19).replace('T', ' ');
+}
+
+/* sweep: auto-complete every request whose 24-hour window has expired */
+function sweepAutoComplete() {
+  const due = q.all(`SELECT * FROM document_requests
+    WHERE claimed_at != '' AND status != 'Completed'
+      AND datetime(claimed_at, '+24 hours') <= datetime('now')`);
+  for (const r of due) {
+    q.run(`UPDATE document_requests SET status='Completed',
+           updated_at=datetime('now') WHERE id=?`, r.id);
+    const studentUser = q.get('SELECT id FROM users WHERE student_id=?', r.student_id);
+    if (studentUser) {
+      notify(studentUser.id, 'Request Completed',
+        r.ref + ' (' + r.doc_type + ') → Completed. The 24-hour claim window has ended.', 'request');
+    }
+    logActivity(null, 'system', 'REQUEST_AUTO_COMPLETED', r.ref);
+  }
+  return due.length;
+}
+/* run the sweep every minute while the server is up */
+setInterval(() => { try { sweepAutoComplete(); } catch (e) { /* keep the loop alive */ } }, 60000);
+
+/* POST /api/requests/:id/claim — admin scans the request QR:
+   starts (or reports) the 24-hour window. Idempotent — re-scanning
+   does NOT restart the clock. */
+router.post('/:id/claim', requireAuth, (req, res) => {
+  if (req.user.role !== 'admin') {
+    return res.status(403).json({ error: 'Only the registrar can scan a request' });
+  }
+  const reqRow = q.get('SELECT * FROM document_requests WHERE id=?', req.params.id);
+  if (!reqRow) return res.status(404).json({ error: 'Request not found' });
+  if (reqRow.status === 'Completed') {
+    return res.json({
+      message: 'Already completed', status: 'Completed',
+      claimed_at: reqRow.claimed_at || '', auto_complete_at: '', started: false
+    });
+  }
+  let claimedAt = reqRow.claimed_at || '';
+  let started = false;
+  if (!claimedAt) {
+    claimedAt = utcNow();
+    q.run(`UPDATE document_requests SET claimed_at=?, updated_at=datetime('now')
+           WHERE id=?`, claimedAt, reqRow.id);
+    started = true;
+    const studentUser = q.get('SELECT id FROM users WHERE student_id=?', reqRow.student_id);
+    if (studentUser) {
+      notify(studentUser.id, 'Document Scanned at the Registrar',
+        reqRow.ref + ' (' + reqRow.doc_type + ') was scanned. It will be marked Completed ' +
+        'automatically in 24 hours unless the registrar completes it earlier.', 'request');
+    }
+    logActivity(req.user.id, req.user.name, 'QR_CLAIM_SCAN', reqRow.ref);
+  }
+  res.json({
+    message: started ? '24-hour claim window started' : 'Claim window already running',
+    started, status: reqRow.status,
+    claimed_at: claimedAt, auto_complete_at: plus24h(claimedAt)
+  });
+});
+
+/* POST /api/requests/auto-complete — admin: run the sweep on demand
+   (also exercised by the test suite; the interval runs it every minute) */
+router.post('/auto-complete', requireAuth, (req, res) => {
+  if (req.user.role !== 'admin') {
+    return res.status(403).json({ error: 'Admin only' });
+  }
+  res.json({ completed: sweepAutoComplete() });
 });
 
 module.exports = router;

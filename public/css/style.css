@@ -668,6 +668,20 @@ html[data-theme="dark"] .chat-item .subj { color:var(--primary-deep); }
   display:flex; flex-direction:column; gap:4px;
 }
 .pickup-note .muted { color:var(--muted); }
+/* 24-hour claim window banner in the QR scanner result */
+.claim-note {
+  background:var(--info-pale); border:1px solid var(--info); color:var(--info);
+  border-radius:var(--radius-sm); padding:11px 14px; font-size:13.5px; margin-top:10px;
+  display:flex; flex-direction:column; gap:4px; text-align:left;
+}
+.claim-note .muted { color:var(--muted); }
+.claim-note.locked { background:var(--surface-3); border-color:var(--border); color:var(--muted); }
+/* completed request → pickup schedule frozen */
+.pickup-locked {
+  display:inline-flex; align-items:center; gap:5px; font-weight:650; color:var(--muted);
+  font-size:13px;
+}
+.claim-tick { font-size:11.5px; margin-top:3px; }
 
 /* ---------- 17. Modal + toast ---------- */
 .modal-backdrop {

@@ -180,6 +180,66 @@ async function call(method, path, token, body) {
   assert(r.status === 200 && r.data.pickup_date === '2026-10-24' && r.data.pickup_time === '07:15',
     'admin edits the pickup schedule without touching the status');
 
+  /* --- 24-hour claim window: scanning the request QR starts the clock --- */
+  r = await call('POST', `/api/requests/${reqId}/claim`, student, {});
+  assert(r.status === 403, 'student cannot start a claim window');
+  r = await call('POST', `/api/requests/${reqId}/claim`, admin, {});
+  assert(r.status === 200 && r.data.started === true && !!r.data.auto_complete_at,
+    'admin scan starts the 24-hour claim window → auto-complete ' + (r.data.auto_complete_at || '?'));
+  const claimedStamp = r.data.claimed_at;
+  assert(!!claimedStamp, 'claim timestamp recorded');
+  r = await call('POST', `/api/requests/${reqId}/claim`, admin, {});
+  assert(r.status === 200 && r.data.started === false && r.data.claimed_at === claimedStamp,
+    're-scanning does NOT restart the 24-hour clock');
+  r = await call('GET', '/api/qr/lookup?code=' + reqRef, admin);
+  assert(r.status === 200 && r.data.claimed_at === claimedStamp,
+    'QR lookup reports when the request was scanned');
+  r = await call('POST', '/api/requests/auto-complete', student, {});
+  assert(r.status === 403, 'student cannot run the auto-complete sweep');
+
+  /* backdate the claim past 24h → the sweep must complete it */
+  {
+    const path = require('path');
+    const { DatabaseSync } = require('node:sqlite');
+    const dbFile = path.isAbsolute(process.env.DB_PATH || '')
+      ? process.env.DB_PATH
+      : path.join(__dirname, process.env.DB_PATH || 'database/smart-registrar.db');
+    const db = new DatabaseSync(dbFile);
+    db.exec('PRAGMA busy_timeout = 5000;');
+    db.prepare("UPDATE document_requests SET claimed_at=datetime('now','-25 hours') WHERE id=?").run(reqId);
+    db.close();
+  }
+  r = await call('POST', '/api/requests/auto-complete', admin, {});
+  assert(r.status === 200 && r.data.completed >= 1, 'sweep auto-completes the expired claim window');
+  r = await call('GET', '/api/requests', admin);
+  assert(r.data.find(x => x.id === reqId).status === 'Completed',
+    'request auto-marked Completed after 24 hours');
+  r = await call('GET', '/api/notifications', student);
+  assert(r.data.some(n => n.title === 'Request Completed' && /24-hour/i.test(n.body)),
+    'student notified of the automatic completion');
+
+  /* --- Completed freezes the pickup schedule --- */
+  r = await call('PUT', `/api/requests/${reqId}/pickup`, admin, { date: '2026-10-25', time: '09:00' });
+  assert(r.status === 409, 'completed request refuses pickup edits (409)');
+  r = await call('PUT', `/api/requests/${reqId}/status`, admin, { status: 'Completed', pickupDate: '2026-10-26' });
+  assert(r.status === 409, 'a status change cannot sneak a new pickup date onto a completed request');
+  r = await call('GET', '/api/requests', admin);
+  const frozen = r.data.find(x => x.id === reqId);
+  assert(frozen.pickup_date === '2026-10-24' && frozen.pickup_time === '07:15',
+    'the locked pickup schedule is untouched after the refused edits');
+
+  /* manual completion still works — no scan, no timer required */
+  r = await call('POST', '/api/requests', student, { docType: 'Good Moral', quantity: 1, purpose: 'Manual completion test' });
+  assert(r.status === 201, 'second fixture request created');
+  const reqManual = r.data.id;
+  r = await call('PUT', `/api/requests/${reqManual}/status`, admin, { status: 'Completed' });
+  assert(r.status === 200, 'admin may still press Completed manually (no QR scan needed)');
+  r = await call('PUT', `/api/requests/${reqManual}/pickup`, admin, { date: '2026-10-26', time: '10:00' });
+  assert(r.status === 409, 'manually completed request is locked too');
+  r = await call('POST', `/api/requests/${reqManual}/claim`, admin, {});
+  assert(r.status === 200 && r.data.started === false && r.data.status === 'Completed',
+    'scanning an already-completed request does nothing');
+
   /* --- students CRUD (admin) --- */
   r = await call('GET', '/api/students?search=' + stuNum, admin);
   assert(r.status === 200 && r.data.length >= 1, 'admin search students');

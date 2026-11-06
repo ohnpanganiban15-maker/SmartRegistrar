@@ -67,6 +67,7 @@ const evalA = expr => w.eval(expr);
       ? process.env.DB_PATH
       : path.join(__dirname, process.env.DB_PATH || 'database/smart-registrar.db');
     const db = new DatabaseSync(dbFile);
+    db.exec('PRAGMA busy_timeout = 5000;');
     db.exec("DELETE FROM announcements WHERE title='Dashboard Panel Fixture'");
     db.prepare("INSERT INTO announcements (title, body) VALUES (?,?)")
       .run('Dashboard Panel Fixture', 'Fixture announcement for the dashboard panel test.');
@@ -472,6 +473,37 @@ const evalA = expr => w.eval(expr);
   assert((await rowOf(reqF.id)).status === 'Ready for Pickup',
     'request finally marked ready with the edited schedule');
 
+  /* --- QR scan starts the 24-hour claim window --- */
+  const reqCode = (await rowOf(reqF.id)).ref;
+  await w.eval(`go('adminScanner')`);
+  await sleep(250);
+  w.document.getElementById('scan-code').value = reqCode;
+  evalA(`lookupCode()`);
+  await sleep(700);
+  {
+    const res = w.document.getElementById('scan-result');
+    const txt = res ? res.textContent : '';
+    assert(/24-hour claim window started/i.test(txt),
+      'scanning the request QR starts the 24-hour claim window');
+    assert(/auto-completes/i.test(txt), 'scanner shows when the request auto-completes');
+    const row = await rowOf(reqF.id);
+    assert(!!row && !!row.claimed_at, 'claim timestamp saved on the request');
+  }
+  const stamp1 = (await rowOf(reqF.id)).claimed_at;
+  evalA(`lookupCode()`);
+  await sleep(700);
+  {
+    const res = w.document.getElementById('scan-result');
+    const txt = res ? res.textContent : '';
+    assert(/claim window running/i.test(txt), 'second scan reports the window already running');
+    assert((await rowOf(reqF.id)).claimed_at === stamp1,
+      'second scan does not restart the 24-hour clock');
+  }
+  await w.eval(`go('adminRequests')`);
+  await sleep(300);
+  assert(/auto-complete/.test($app()), 'requests table shows the auto-complete countdown');
+  assert($app().includes('editPickup'), 'a ready request still offers the editable pickup cell');
+
   /* --- theme toggle + persistence --- */
   evalA(`toggleTheme()`);
   await sleep(50);
@@ -502,6 +534,31 @@ const evalA = expr => w.eval(expr);
       'note shows the claim date (' + wantDate + ')');
     assert(!!note && note.textContent.includes(wantTime),
       'note shows the claim time (' + wantTime + ')');
+  }
+  w.eval(`logout()`);
+  await sleep(120);
+
+  /* --- Completed freezes the pickup schedule (admin) --- */
+  w.document.getElementById('li-email').value = 'admin@cdlshs.edu.ph';
+  w.document.getElementById('li-pass').value = 'registrar123';
+  await w.doLogin({ preventDefault: () => {} });
+  await sleep(300);
+  await w.eval(`go('adminRequests')`);
+  await sleep(300);
+  evalA(`setReqStatus(${reqF.id}, 'Completed')`);
+  await sleep(500);
+  {
+    const row = await rowOf(reqF.id);
+    assert(!!row && row.status === 'Completed', 'admin may still press Completed manually');
+    assert($app().includes('pickup-locked'), 'completed request shows a locked pickup cell');
+    assert(!$app().includes('editPickup(' + reqF.id + ')'),
+      'the completed row has no edit button left');
+    const err = await w.eval(`Api.put('/api/requests/${reqF.id}/pickup',
+      { date: '2027-01-01', time: '10:00' }).then(() => '', e => e.message)`);
+    assert(/locked/i.test(String(err)), 'API refuses pickup edits on a completed request → ' + err);
+    const still = await rowOf(reqF.id);
+    assert(still.pickup_date === day5 && still.pickup_time === '14:00',
+      'the locked pickup date + time are untouched');
   }
   w.eval(`logout()`);
   await sleep(120);

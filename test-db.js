@@ -11,6 +11,7 @@ function purge() {
     : path.join(__dirname, process.env.DB_PATH || 'database/smart-registrar.db');
   const db = new DatabaseSync(file);
   db.exec('PRAGMA foreign_keys = ON;');
+  db.exec('PRAGMA busy_timeout = 5000;');
   db.exec(
     'DELETE FROM notifications;' +
     'DELETE FROM messages;' +

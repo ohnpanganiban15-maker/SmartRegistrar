@@ -16,6 +16,8 @@ fs.mkdirSync(path.dirname(dbFile), { recursive: true });
 
 const db = new DatabaseSync(dbFile);
 db.exec('PRAGMA foreign_keys = ON;');
+/* wait (instead of failing) when another process/connection holds the DB */
+db.exec('PRAGMA busy_timeout = 5000;');
 
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS users (
@@ -86,6 +88,7 @@ CREATE TABLE IF NOT EXISTS document_requests (
   purpose     TEXT NOT NULL DEFAULT '',
   pickup_date TEXT NOT NULL DEFAULT '',
   pickup_time TEXT NOT NULL DEFAULT '',
+  claimed_at  TEXT NOT NULL DEFAULT '',
   notes       TEXT NOT NULL DEFAULT '',
   status      TEXT NOT NULL DEFAULT 'Pending'
               CHECK(status IN ('Pending','Processing','Ready for Pickup','Completed','Rejected','Cancelled')),
@@ -180,6 +183,7 @@ ensureColumn('users', "locked_until TEXT NOT NULL DEFAULT ''");
 ensureColumn('users', 'token_version INTEGER NOT NULL DEFAULT 0');
 ensureColumn('students', "profile_photo TEXT NOT NULL DEFAULT ''");
 ensureColumn('document_requests', "pickup_time TEXT NOT NULL DEFAULT ''");
+ensureColumn('document_requests', "claimed_at TEXT NOT NULL DEFAULT ''");
 
 /* ---- ensure required document types exist (safe on old + fresh DBs) ---- */
 const insertDocType = db.prepare('INSERT OR IGNORE INTO document_types (name) VALUES (?)');
