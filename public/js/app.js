@@ -17,6 +17,10 @@ const state = {
   studentFilter: { search: '', grade: '', status: '' },
   apptAdminFilter: { search: '', status: '', from: '', to: '' },
   reqAdminFilter: { search: '', status: '' },
+  logFilter: { search: '', action: '', from: '', to: '' },
+  logFacets: null,
+  reportRange: { from: '', to: '' },
+  analytics: null,
   unread: 0,
   pendingReq: 0,
   sidebarOpen: false,
@@ -32,12 +36,14 @@ const VIEWS = {
   availability: viewAvailability, apptConfirmed: viewApptConfirmed,
   myAppointments: viewMyAppointments, myRequests: viewMyRequests,
   notifications: viewNotifications, service: viewService, myQr: viewMyQr,
+  assistant: viewAssistant,
   profile: viewProfile, announcements: viewAnnouncements,
   adminDashboard: viewAdminDashboard, adminStudents: viewAdminStudents,
   adminAppointments: viewAdminAppointments, adminRequests: viewAdminRequests,
   adminAvailability: viewAdminAvailability, adminScanner: viewAdminScanner,
   adminAnnouncements: viewAdminAnnouncements, adminService: viewAdminService,
-  adminLogs: viewAdminLogs, adminReports: viewAdminReports
+  adminLogs: viewAdminLogs, adminReports: viewAdminReports,
+  adminAnalytics: viewAdminAnalytics
 };
 
 function isAdminView(v) { return String(v).startsWith('admin'); }
@@ -92,6 +98,8 @@ async function loadView(view) {
       state.me = await Api.get('/api/auth/me'); return;
     case 'announcements':
       state.anns = await Api.get('/api/announcements'); return;
+    /* the assistant is a pure client-side knowledge base (works offline in the APK) */
+    case 'assistant': return;
     case 'adminDashboard': {
       const [stats, slots, reports] = await Promise.all([
         Api.get('/api/dashboard/stats'), Api.get('/api/slots/all'), Api.get('/api/reports')]);
@@ -111,10 +119,24 @@ async function loadView(view) {
       state.anns = await Api.get('/api/announcements'); return;
     case 'adminService':
       state.chats = await Api.get('/api/chat'); return;
-    case 'adminLogs':
-      state.logs = await Api.get('/api/logs'); return;
+    case 'adminLogs': {
+      const f = state.logFilter || {};
+      const qs = ['limit=200'];
+      if (f.search) qs.push('search=' + encodeURIComponent(f.search));
+      if (f.action) qs.push('action=' + encodeURIComponent(f.action));
+      if (f.from) qs.push('from=' + encodeURIComponent(f.from));
+      if (f.to) qs.push('to=' + encodeURIComponent(f.to));
+      const [logs, facets] = await Promise.all([
+        Api.get('/api/logs?' + qs.join('&')), Api.get('/api/logs/facets')]);
+      state.logs = logs; state.logFacets = facets; return;
+    }
     case 'adminReports':
       state.reports = await Api.get('/api/reports'); return;
+    case 'adminAnalytics': {
+      const [analytics, stats] = await Promise.all([
+        Api.get('/api/analytics'), Api.get('/api/dashboard/stats')]);
+      Object.assign(state, { analytics, stats }); return;
+    }
     case 'apptConfirmed': return;
   }
 }
@@ -253,6 +275,7 @@ function studentShell(content) {
           <a class="${cur === v ? 'active' : ''}" onclick="go('${v}')" href="javascript:void(0)">${lb}</a>`).join('')}
       </nav>
       <div class="topbar-actions">
+        <button class="icon-btn" onclick="go('assistant')" title="Virtual Registrar Assistant">🤖</button>
         <button class="icon-btn" onclick="go('myQr')" title="My QR code">▣</button>
         <button class="icon-btn" onclick="askLogout()" title="Log out">↩</button>
       </div>
@@ -274,7 +297,8 @@ function adminShell(content) {
     ['adminRequests', '▤', 'Requests'],
     ['adminAvailability', '◔', 'Pickup Schedule'], ['adminScanner', '▣', 'QR Scanner'],
     ['adminAnnouncements', '📢', 'Announcements'], ['adminService', '✉', 'Customer Service'],
-    ['adminReports', '📊', 'Reports'], ['adminLogs', '≡', 'Activity Logs']
+    ['adminReports', '📊', 'Reports'], ['adminAnalytics', '📈', 'Analytics'],
+    ['adminLogs', '≡', 'Activity Logs']
   ];
   const openChats = (state.chats || []).filter(m => m.status === 'Open').length;
   const mobileNav = [
@@ -1166,6 +1190,330 @@ async function editPickup(id) {
   } catch (err) { toast(err.message, 'error'); }
 }
 
+/* ---------- request timeline (advanced tracking) ---------- */
+function timelineHTML(t) {
+  const evts = (t && t.events) || [];
+  if (!evts.length) return '<div class="empty">No recorded steps yet.</div>';
+  return '<ol class="timeline">' + evts.map(e => `
+    <li class="tl-item tl-${esc(e.kind || 'step')}">
+      <span class="tl-dot"></span>
+      <div class="tl-body">
+        <div class="tl-label"><b>${esc(e.label)}</b>
+          <span class="muted small">${esc(String(e.at || '').replace('T', ' ').slice(0, 16))}</span></div>
+        <div class="muted small">${esc(e.detail || '')}${e.actor ? ' · ' + esc(e.actor) : ''}</div>
+      </div>
+    </li>`).join('') + '</ol>';
+}
+
+/* inline expand / collapse inside a student request card */
+async function toggleTimeline(id, btn) {
+  const box = document.getElementById('tl-' + id);
+  if (!box) return;
+  if (box.dataset.open === '1') {
+    box.dataset.open = '0'; box.innerHTML = '';
+    if (btn) btn.textContent = '🕘 History';
+    return;
+  }
+  if (btn) btn.textContent = 'Loading…';
+  try {
+    const t = await Api.get('/api/requests/' + id + '/timeline');
+    box.dataset.open = '1';
+    box.innerHTML = timelineHTML(t);
+    if (btn) btn.textContent = '🕘 Hide history';
+  } catch (err) {
+    if (btn) btn.textContent = '🕘 History';
+    toast(err.message, 'error');
+  }
+}
+
+/* modal version — used from the admin requests table */
+async function showTimeline(id) {
+  openModal(`
+    <div class="modal-head">
+      <div class="modal-title">🕘 Request timeline</div>
+      <button class="modal-x" onclick="closeModal()" aria-label="Close">&times;</button>
+    </div>
+    <div class="modal-body" id="tl-modal"><div class="muted">Loading…</div></div>
+    <div class="modal-actions">
+      <button class="btn btn-primary" onclick="closeModal()">Close</button>
+    </div>`);
+  try {
+    const t = await Api.get('/api/requests/' + id + '/timeline');
+    const body = document.getElementById('tl-modal');
+    if (body) {
+      body.innerHTML =
+        '<div class="muted small" style="margin-bottom:10px;"><b class="mono">' + esc(t.ref) +
+        '</b> · ' + esc(t.doc_type) + ' · ' + stamp(t.status) + '</div>' + timelineHTML(t);
+    }
+  } catch (err) {
+    const body = document.getElementById('tl-modal');
+    if (body) body.innerHTML = '<div class="error-box">' + esc(err.message) + '</div>';
+  }
+}
+
+/* ---------- virtual registrar assistant (knowledge base + chat) ---------- */
+const ASSISTANT_KB = [
+  {
+    keys: ['requirement', 'requirements', 'kailangan', 'ano ang need', 'needed', 'anong documents',
+      'documents needed', 'magkailangan', 'what do i need', 'gilid'],
+    text: 'To request a document you need: (1) your LRN / student number, (2) the purpose of the ' +
+      'request, and (3) an account in this app. Open **Requests → + New Request**, pick the document ' +
+      'type, then submit — the registrar is notified instantly.',
+    action: { js: "go('myRequests')", label: 'Open My Requests' }
+  },
+  {
+    keys: ['appointment', 'book', 'booking', 'schedule a', 'reservation', 'reserve', 'paano mag book',
+      'mag book', 'available slot'],
+    text: 'Go to **Schedule**, pick a service, choose an open date and slot, add your purpose, then ' +
+      'submit. It starts as *Pending* — you get a notification once the registrar approves it.',
+    action: { js: "go('availability')", label: 'View schedule' }
+  },
+  {
+    keys: ['track', 'tracking', 'status', 'timeline', 'history', 'progress', 'update sa request',
+      'anong status', 'how do i know'],
+    text: 'Open **My Requests** and tap 🕘 *History* on any request — it shows every step: submitted, ' +
+      'processing, ready for pickup, scanned at the counter, and completed, with the exact date and time.',
+    action: { js: "go('myRequests')", label: 'See my requests' }
+  },
+  {
+    keys: ['forgot', 'forgot password', 'reset password', 'password reset', 'nakalimutan', 'di makalogin',
+      'cannot login', 'cant login', 'hindi maka login', 'login problem'],
+    text: 'On the login screen tap **Forgot password?** — you will receive a 6-digit code by email and ' +
+      'can set a new password right away. Remember: a student password is exactly 8 characters with ' +
+      'both letters and numbers.',
+    action: { js: "go('forgotPassword')", label: 'Reset my password' }
+  },
+  {
+    keys: ['claim', 'pickup', 'kailan makukuha', 'kuha', 'when can i get', 'pick up', 'release',
+      'ready for pickup'],
+    text: 'When your request turns **Ready for Pickup**, a green note appears with the exact date and ' +
+      'time set by the registrar — plus a notification. Bring your school ID or show your QR at the counter.',
+    action: { js: "go('myRequests')", label: 'Check my requests' }
+  },
+  {
+    keys: ['24', 'auto complete', 'autocomplete', 'automatic', 'scan', 'scanned', 'window'],
+    text: 'When the registrar scans your request QR, a **24-hour claim window** starts. If it is not ' +
+      'claimed in that window the request completes automatically — the registrar can also press ' +
+      'Completed manually at any time.',
+    action: { js: "go('myQr')", label: 'Show my QR' }
+  },
+  {
+    keys: ['qr', 'barcode', 'code', 'scan ko', 'qr code'],
+    text: 'Your **My QR** page holds your student verification code and a QR for each active request ' +
+      'or appointment. Show it at the counter — the registrar scans or types the reference code.',
+    action: { js: "go('myQr')", label: 'Open My QR' }
+  },
+  {
+    keys: ['password', 'password rule', 'ano ang password', '8 characters', 'change password'],
+    text: 'Student passwords are **exactly 8 characters** and must contain both letters and numbers. ' +
+      'You can change yours any time from Profile → Change password (a 6-digit code is emailed to you).',
+    action: { js: "go('profile')", label: 'Open my profile' }
+  },
+  {
+    keys: ['lock', 'locked', '5 attempts', 'wrong password', 'maling password', 'too many'],
+    text: 'Five consecutive wrong passwords lock the account for **15 minutes**. Wait it out, use ' +
+      '*Forgot password?*, or retype the email carefully — a failed login keeps your email but clears ' +
+      'only the password field.',
+    action: { js: "go('forgotPassword')", label: 'Reset my password' }
+  },
+  {
+    keys: ['cancel', 'delete my request', 'void', 'babawasan'],
+    text: 'While a request is still **Pending** or **Processing** you can cancel it yourself from ' +
+      '**My Requests**. Once it is Ready for Pickup, talk to the registrar through Customer Service.',
+    action: { js: "go('myRequests')", label: 'Open My Requests' }
+  },
+  {
+    keys: ['fee', 'fees', 'bayad', 'magkano', 'how much', 'price', 'payment', 'pay'],
+    text: 'The app never asks for payment — any fees are settled at the registrar\'s counter when you ' +
+      'claim your document. The schedule and status here are always free to view.'
+  },
+  {
+    keys: ['hours', 'open', 'office hours', 'anong oras', 'sched', 'when open', 'close'],
+    text: 'Pickup and appointment hours come from the **Pickup Schedule** the registrar posts in the ' +
+      'app. Whatever is shown as an open slot is when the counter is serving students.',
+    action: { js: "go('availability')", label: 'View schedule' }
+  },
+  {
+    keys: ['announcement', 'notice', 'paunawa', 'balita'],
+    text: 'Every announcement from the registrar appears on your dashboard and under **Announcements** — ' +
+      'check it before you go to the counter.',
+    action: { js: "go('announcements')", label: 'Read announcements' }
+  },
+  {
+    keys: ['person', 'human', 'real', 'admin', 'registrar', 'talk to', 'tao', 'help pa', 'customer service',
+      'complaint', 'concern'],
+    text: 'For anything personal — corrections, special requests, or concerns — open **Customer Service** ' +
+      'and the registrar will reply inside the app.',
+    action: { js: "go('service')", label: 'Open Customer Service' }
+  },
+  {
+    keys: ['thank', 'salamat', 'thanks', 'ty', 'appreciate'],
+    text: 'You\'re welcome! Anything else about requests, appointments or your QR?'
+  },
+  {
+    keys: ['hi', 'hello', 'hey', 'good morning', 'good afternoon', 'good evening', 'kumusta'],
+    text: 'Hello! 👋 I can explain document requirements, appointment booking, request tracking, QR codes ' +
+      'and account issues. What do you need?'
+  }
+];
+const ASSISTANT_FALLBACK =
+  'I\'m not sure about that one. Try one of the questions below — or tap **Talk to a person** and the ' +
+  'registrar will answer you directly.';
+
+function _assistantScore(entry, q) {
+  let score = 0;
+  for (const k of entry.keys) if (q.indexOf(k) !== -1) score += k.length > 4 ? 2 : 1;
+  return score;
+}
+function assistantAnswer(q) {
+  const text = String(q || '').toLowerCase().trim();
+  if (!text) return null;
+  let best = null, bestScore = 0;
+  for (const e of ASSISTANT_KB) {
+    const s = _assistantScore(e, text);
+    if (s > bestScore) { bestScore = s; best = e; }
+  }
+  if (!best || bestScore === 0) {
+    return { text: ASSISTANT_FALLBACK, action: { js: "go('service')", label: 'Talk to a person' } };
+  }
+  return { text: best.text.replace(/\*\*/g, '').replace(/\*/g, ''), action: best.action || null };
+}
+function _assistantScroll() {
+  const el = document.getElementById('asst-thread');
+  if (el) el.scrollTop = el.scrollHeight;
+}
+function assistantAsk(question) {
+  const q = String(question || '').trim();
+  if (!q) return;
+  state.assistant = state.assistant || [];
+  state.assistant.push({ who: 'me', text: q });
+  const a = assistantAnswer(q) || { text: ASSISTANT_FALLBACK };
+  state.assistant.push({ who: 'bot', text: a.text, action: a.action });
+  render();
+  _assistantScroll();
+}
+function assistantSend(ev) {
+  if (ev) ev.preventDefault();
+  const el = document.getElementById('asst-input');
+  const q = el ? el.value : '';
+  if (el) el.value = '';
+  assistantAsk(q);
+}
+
+/* ---------- admin: activity log filters ---------- */
+let _logTimer = null;
+function setLogFilter(key, val, debounce) {
+  state.logFilter = state.logFilter || { search: '', action: '', from: '', to: '' };
+  state.logFilter[key] = val || '';
+  if (key === 'search') _restoreFocusId = 'lg-search';
+  if (_logTimer) clearTimeout(_logTimer);
+  const run = () => { loadView('adminLogs').then(render).catch(e => toast(e.message, 'error')); };
+  if (debounce) _logTimer = setTimeout(run, 300);
+  else run();
+}
+function clearLogFilter() {
+  state.logFilter = { search: '', action: '', from: '', to: '' };
+  loadView('adminLogs').then(render).catch(e => toast(e.message, 'error'));
+}
+
+/* ---------- printable reports ---------- */
+function _reportRange() {
+  const r = state.reportRange || { from: '', to: '' };
+  return d => {
+    const day = String(d || '').slice(0, 10);
+    if (r.from && day && day < r.from) return false;
+    if (r.to && day && day > r.to) return false;
+    return true;
+  };
+}
+function setReportRange(key, val) {
+  state.reportRange = state.reportRange || { from: '', to: '' };
+  state.reportRange[key] = val || '';
+  render();
+}
+async function printReport(kind) {
+  const inRange = _reportRange();
+  const r = state.reportRange || {};
+  const rangeLabel = (r.from || r.to)
+    ? 'From ' + (r.from || '…') + ' to ' + (r.to || '…')
+    : 'All records';
+  const by = (state.me && state.me.name) || 'Registrar';
+  try {
+    let opts;
+    if (kind === 'requests') {
+      const list = (await Api.get('/api/requests')).filter(x => inRange(x.created_at));
+      opts = {
+        title: 'Document Requests Report', subtitle: rangeLabel, by,
+        head: ['Ref', 'Student', 'Document', 'Qty', 'Pickup schedule', 'Status', 'Filed'],
+        rows: list.map(x => [x.ref, x.student_name, x.doc_type, x.quantity,
+          (x.pickup_date || '') + (x.pickup_time ? ' · ' + fmtTime(x.pickup_time) : ''),
+          x.status, String(x.created_at).slice(0, 10)]),
+        meta: [{ label: 'Records:', value: list.length }]
+      };
+    } else if (kind === 'appointments') {
+      const list = (await Api.get('/api/appointments')).filter(x => inRange(x.created_at));
+      opts = {
+        title: 'Appointments Report', subtitle: rangeLabel, by,
+        head: ['Ref', 'Student', 'Service', 'Schedule', 'Status', 'Filed'],
+        rows: list.map(x => [x.ref, x.student_name, x.service,
+          fmtDateShort(x.date) + ' · ' + timeRange(x.start_time, x.end_time),
+          x.status, String(x.created_at).slice(0, 10)]),
+        meta: [{ label: 'Records:', value: list.length }]
+      };
+    } else if (kind === 'students') {
+      const list = (await Api.get('/api/students')).filter(x => inRange(x.created_at));
+      opts = {
+        title: 'Student Roster', subtitle: rangeLabel, by,
+        head: ['LRN / Student No.', 'Name', 'Grade', 'Strand', 'Status', 'Registered'],
+        rows: list.map(x => [x.student_number, (x.first_name || '') + ' ' + (x.last_name || ''),
+          x.grade_level ? 'Grade ' + x.grade_level : '—', x.strand || '—', x.status,
+          String(x.created_at).slice(0, 10)]),
+        meta: [{ label: 'Students:', value: list.length }]
+      };
+    } else {
+      const [an, st] = await Promise.all([Api.get('/api/analytics'), Api.get('/api/dashboard/stats')]);
+      const rq = an.requests || {}, ap = an.appointments || {};
+      opts = {
+        title: 'Registrar Summary', subtitle: schoolYear() + ' · ' + currentSem(), by,
+        head: ['Indicator', 'Value'],
+        rows: [
+          ['Total students', st.totalStudents],
+          ['Document requests (all)', rq.total],
+          ['Completed', rq.completed + ' (' + rq.completionRate + '%)'],
+          ['Rejected / cancelled', rq.rejected + ' (' + rq.rejectionRate + '%)'],
+          ['Still in the queue (backlog > 2 days)', rq.backlog],
+          ['Requests filed today / this week', rq.today + ' / ' + rq.week],
+          ['Average turnaround', rq.avgTurnaroundH + ' h'],
+          ['Completed within the 24h claim window', rq.within24hRate + '%'],
+          ['Appointments', ap.total + ' (show rate ' + ap.showRate + '%)'],
+          ['Awaiting approval', ap.pending],
+          ['Most requested document', (an.top.documents[0] || {}).label || '—'],
+          ['Most active requester', (an.top.students[0] || {}).label || '—']
+        ],
+        meta: [{ label: 'Period:', value: rangeLabel }]
+      };
+    }
+    printArea(reportHTML(opts));
+  } catch (e) { toast(e.message, 'error'); }
+}
+/* printable version of whatever the activity log currently shows */
+function printLogs() {
+  const logs = state.logs || [];
+  const f = state.logFilter || {};
+  const bits = [];
+  if (f.search) bits.push('search "' + f.search + '"');
+  if (f.action) bits.push('action ' + f.action);
+  if (f.from || f.to) bits.push((f.from || '…') + ' → ' + (f.to || '…'));
+  printArea(reportHTML({
+    title: 'System Activity Log',
+    subtitle: bits.length ? 'Filtered: ' + bits.join(' · ') : 'All recorded activity',
+    by: (state.me && state.me.name) || 'Registrar',
+    head: ['Time', 'User', 'Action', 'Details'],
+    rows: logs.map(l => [String(l.created_at).replace('T', ' ').slice(0, 16), l.user_name, l.action, l.details]),
+    meta: [{ label: 'Entries:', value: logs.length }]
+  }));
+}
+
 /* ---------- admin: availability ---------- */
 async function saveSlot(id) {
   const date = document.getElementById('sl-date').value;
@@ -1224,7 +1572,12 @@ async function lookupCode(codeOverride) {
     }
     if (out) out.innerHTML = `
       <div class="panel mb-0" style="border-color:var(--primary);">
-        <div class="flex-between">
+        ${d.verify ? `<div class="verify-badge vt-${esc(d.verify.tone || 'ok')}">
+          <span class="vb-icon">${d.verify.tone === 'ok' ? '✔' : d.verify.tone === 'warn' ? '⚠' : d.verify.tone === 'bad' ? '✕' : 'ℹ'}</span>
+          <span class="vb-verdict mono">${esc(d.verify.verdict)}</span>
+          <span class="vb-msg">${esc(d.verify.message || '')}</span>
+        </div>` : ''}
+        <div class="flex-between mt-8">
           <div><b class="mono">${esc(d.ref)}</b> ${stamp(d.status)}</div>
           <span class="muted small">${esc(d.type.replace('_', ' '))}</span>
         </div>

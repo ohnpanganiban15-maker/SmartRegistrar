@@ -87,6 +87,63 @@ router.get('/pending-count', requireAuth, (req, res) => {
   res.json({ count: q.get("SELECT COUNT(*) c FROM document_requests WHERE status='Pending'").c });
 });
 
+/* GET /api/requests/:id/timeline — advanced tracking.
+   Rebuilds the full step-by-step history of one request from the
+   activity log (submitted → processing → ready → scanned → completed),
+   plus the scheduled claim deadline. Owner student or admin only. */
+const TIMELINE_ACTIONS = {
+  SUBMIT_REQUEST: ['Request submitted', 'submitted'],
+  REQUEST_PROCESSING: ['Moved to Processing', 'step'],
+  REQUEST_READY_FOR_PICKUP: ['Marked Ready for Pickup', 'ready'],
+  REQUEST_COMPLETED: ['Completed by the registrar', 'done'],
+  REQUEST_AUTO_COMPLETED: ['Auto-completed after the 24-hour window', 'done'],
+  REQUEST_REJECTED: ['Rejected', 'bad'],
+  REQUEST_CANCELLED: ['Cancelled', 'bad'],
+  REQUEST_PENDING: ['Reopened', 'step'],
+  QR_CLAIM_SCAN: ['QR scanned — 24-hour claim window started', 'scan'],
+  SET_PICKUP_SCHEDULE: ['Pickup schedule set', 'ready']
+};
+router.get('/:id/timeline', requireAuth, (req, res) => {
+  const r = q.get('SELECT * FROM document_requests WHERE id=?', req.params.id);
+  if (!r) return res.status(404).json({ error: 'Request not found' });
+  if (req.user.role !== 'admin' && r.student_id !== req.user.studentId) {
+    return res.status(403).json({ error: 'Not your request' });
+  }
+  const rows = q.all(
+    `SELECT action, details, user_name, created_at FROM activity_logs
+     WHERE details = ? OR details LIKE ? ORDER BY created_at ASC, id ASC`,
+    r.ref, r.ref + ' %');
+  const events = [];
+  for (const l of rows) {
+    const m = TIMELINE_ACTIONS[l.action];
+    if (!m) continue;
+    events.push({
+      at: l.created_at, label: m[0], kind: m[1], actor: l.user_name || 'system',
+      detail: l.action === 'SUBMIT_REQUEST' ? r.doc_type + ' × ' + r.quantity : ''
+    });
+  }
+  /* the very first step is always the submission itself */
+  if (!events.length || events[0].label !== 'Request submitted') {
+    events.unshift({
+      at: r.created_at, label: 'Request submitted', kind: 'submitted',
+      actor: r.student_name, detail: r.doc_type + ' × ' + r.quantity
+    });
+  }
+  /* the 24-hour claim deadline is a milestone worth showing */
+  if (r.claimed_at && r.status !== 'Completed') {
+    events.push({
+      at: plus24h(r.claimed_at), label: 'Claim window ends — auto-completes',
+      kind: 'scheduled', actor: 'system', detail: ''
+    });
+  }
+  events.sort((a, b) => String(a.at).localeCompare(String(b.at)));
+  res.json({
+    ref: r.ref, status: r.status, doc_type: r.doc_type,
+    pickup_date: r.pickup_date || '', pickup_time: r.pickup_time || '',
+    claimed_at: r.claimed_at || '', events
+  });
+});
+
 /* PUT /api/requests/:id/status — admin updates, or student cancels own
    Admin may also hand over the pickup date + time in this same call
    (the UI collects them the moment "Ready for Pickup" is chosen). */

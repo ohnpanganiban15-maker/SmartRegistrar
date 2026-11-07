@@ -240,6 +240,38 @@ async function call(method, path, token, body) {
   assert(r.status === 200 && r.data.started === false && r.data.status === 'Completed',
     'scanning an already-completed request does nothing');
 
+  /* --- advanced tracking: per-request timeline --- */
+  r = await call('GET', `/api/requests/${reqId}/timeline`, student);
+  assert(r.status === 200 && Array.isArray(r.data.events),
+    'owner student can read the request timeline');
+  {
+    const tl = r.data.events;
+    assert(tl.some(e => e.label === 'Request submitted'), 'timeline starts with the submission step');
+    assert(tl.some(e => e.kind === 'scan'), 'timeline records the QR scan / claim window');
+    assert(tl.some(e => e.kind === 'done'), 'timeline records the completion');
+    let chrono = true;
+    for (let i = 1; i < tl.length; i++) if (String(tl[i - 1].at) > String(tl[i].at)) chrono = false;
+    assert(chrono, 'timeline events are chronological (' + tl.length + ' steps)');
+  }
+  r = await call('GET', `/api/requests/${reqManual}/timeline`, admin);
+  assert(r.status === 200 && r.data.ref, 'admin can read any request timeline');
+  r = await call('GET', '/api/requests/999999/timeline', admin);
+  assert(r.status === 404, 'unknown request timeline → 404');
+  /* a different student must not read someone else's history */
+  const tlEmail = 'tl.reader.' + uniq + '@cdlshs.edu.ph';
+  r = await call('POST', '/api/auth/register', null, {
+    firstName: 'Timeline', lastName: 'Reader', email: tlEmail,
+    password: 'other123', studentNumber: 'S-2026-Z' + uniq.toUpperCase().slice(-6),
+    gradeLevel: '11', strand: 'STEM'
+  });
+  assert(r.status === 201 && r.data.devOtp, 'timeline reader student registered');
+  r = await call('POST', '/api/auth/register/verify-otp', null, { email: tlEmail, otp: r.data.devOtp });
+  assert(r.status === 201, 'timeline reader OTP verified');
+  r = await call('POST', '/api/auth/login', null, { email: tlEmail, password: 'other123' });
+  const tlTok = r.data.token;
+  r = await call('GET', `/api/requests/${reqId}/timeline`, tlTok);
+  assert(r.status === 403, 'another student cannot read a foreign timeline');
+
   /* --- students CRUD (admin) --- */
   r = await call('GET', '/api/students?search=' + stuNum, admin);
   assert(r.status === 200 && r.data.length >= 1, 'admin search students');
@@ -370,6 +402,79 @@ async function call(method, path, token, body) {
   assert(r.status === 200 && r.data.length > 0, 'activity logs recorded');
   r = await call('GET', '/api/logs', student);
   assert(r.status === 403, 'student blocked from logs');
+
+  /* --- activity log: search + filters + facets --- */
+  r = await call('GET', '/api/logs?search=' + encodeURIComponent(reqRef), admin);
+  assert(r.status === 200 && r.data.length > 0 && r.data.every(l =>
+    (l.user_name + ' ' + l.action + ' ' + l.details).indexOf(reqRef) !== -1),
+    'log search narrows to matching entries (' + r.data.length + ')');
+  r = await call('GET', '/api/logs?action=SUBMIT_REQUEST', admin);
+  assert(r.status === 200 && r.data.length > 0 &&
+    r.data.every(l => l.action === 'SUBMIT_REQUEST'),
+    'log action filter returns only that action');
+  r = await call('GET', '/api/logs?search=no-such-entry-zzz', admin);
+  assert(r.status === 200 && r.data.length === 0, 'log search with no matches → empty list');
+  r = await call('GET', '/api/logs?from=2000-01-01&to=2100-01-01', admin);
+  assert(r.status === 200 && r.data.length > 0, 'log date range keeps matching records');
+  r = await call('GET', '/api/logs?from=2100-01-01', admin);
+  assert(r.status === 200 && r.data.length === 0, 'log date range can exclude everything');
+  r = await call('GET', '/api/logs/facets', admin);
+  assert(r.status === 200 && Array.isArray(r.data.actions) && r.data.actions.length > 0 &&
+    typeof r.data.total === 'number' && r.data.total > 0,
+    'log facets list actions with counts (total ' + r.data.total + ')');
+  r = await call('GET', '/api/logs/facets', student);
+  assert(r.status === 403, 'student blocked from log facets');
+
+  /* --- admin analytics dashboard --- */
+  r = await call('GET', '/api/analytics', admin);
+  assert(r.status === 200 && r.data.requests && r.data.appointments &&
+    r.data.students && r.data.trends && r.data.top, 'analytics returns every KPI group');
+  {
+    const rq = r.data.requests;
+    assert(rq.total >= 1 && rq.completionRate >= 0 && rq.completionRate <= 100,
+      'analytics completion rate is a sane percentage (' + rq.completionRate + '%)');
+    assert(typeof rq.avgTurnaroundH === 'number' && rq.avgTurnaroundH >= 0,
+      'analytics average turnaround computed (' + rq.avgTurnaroundH + 'h)');
+    assert(Array.isArray(r.data.trends.byWeekday) && r.data.trends.byWeekday.length >= 1,
+      'analytics weekday trend present');
+    assert(Array.isArray(r.data.top.documents) && r.data.top.documents.length >= 1,
+      'analytics top documents present');
+    assert(Array.isArray(r.data.students.byGrade) && r.data.students.byGrade.length >= 1,
+      'analytics students-by-grade present');
+  }
+  r = await call('GET', '/api/analytics', student);
+  assert(r.status === 403, 'student blocked from analytics');
+
+  /* --- enhanced QR verification verdicts --- */
+  r = await call('GET', '/api/qr/lookup?code=' + reqRef, admin);
+  assert(r.status === 200 && r.data.verify && r.data.verify.verdict === 'COMPLETED' &&
+    !!r.data.verify.message, 'completed request verifies as COMPLETED');
+  r = await call('GET', '/api/qr/lookup?code=' + apptRef, admin);
+  assert(r.data.verify && r.data.verify.verdict === 'COMPLETED',
+    'completed appointment verifies as COMPLETED');
+  r = await call('GET', '/api/qr/lookup?code=STU-' + stuNum, admin);
+  assert(r.data.verify && r.data.verify.verdict === 'VALID' && !!r.data.verify.message,
+    'active student verifies as VALID with a message');
+  /* open → claimed → rejected */
+  r = await call('POST', '/api/requests', student,
+    { docType: 'Form 137', quantity: 1, purpose: 'Verdict test' });
+  assert(r.status === 201 && !!r.data.ref, 'verdict fixture request created');
+  const vRef = r.data.ref, vId = r.data.id;
+  r = await call('GET', '/api/qr/lookup?code=' + vRef, admin);
+  assert(r.status === 200 && r.data.verify && r.data.verify.verdict === 'VALID',
+    'open request verifies as VALID');
+  r = await call('POST', `/api/requests/${vId}/claim`, admin, {});
+  assert(r.status === 200 && r.data.started === true, 'verdict fixture claim window started');
+  r = await call('GET', '/api/qr/lookup?code=' + vRef, admin);
+  assert(r.data.verify && r.data.verify.verdict === 'IN_WINDOW' &&
+    /auto-completes in/.test(r.data.verify.message),
+    'claimed request verifies as IN_WINDOW with the time left');
+  r = await call('PUT', `/api/requests/${vId}/status`, admin,
+    { status: 'Rejected', reason: 'Verdict test' });
+  assert(r.status === 200, 'verdict fixture rejected');
+  r = await call('GET', '/api/qr/lookup?code=' + vRef, admin);
+  assert(r.data.verify && r.data.verify.verdict === 'INVALID',
+    'rejected request verifies as INVALID');
 
   /* --- notifications read --- */
   r = await call('PUT', '/api/notifications/read-all', student);

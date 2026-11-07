@@ -270,6 +270,7 @@ function viewAdminRequests() {
         <td data-label="Status">${stamp(r.status)}</td>
         <td class="cell-actions" data-label="">
           <button class="btn btn-sm btn-ghost" onclick="showQr('${esc(r.ref)}')">QR</button>
+          <button class="btn btn-sm btn-ghost" onclick="showTimeline(${r.id})" title="Step-by-step history">🕘 History</button>
           <button class="btn btn-sm btn-outline" onclick="Chat.openThread(${r.id})">💬 Chat</button>
           ${statuses.filter(st => st !== r.status).map(st => {
             const cls = st === 'Completed' || st === 'Ready for Pickup' ? 'btn-success' :
@@ -419,12 +420,121 @@ function viewAdminService() {
     </div>`).join('')}`;
 }
 
+/* ---------------- ANALYTICS (admin) ---------------- */
+function rateRing(pct, label, color) {
+  const p = Math.max(0, Math.min(100, Math.round(Number(pct) || 0)));
+  return `
+  <div class="rate-ring" style="--p:${p};--c:${color || 'var(--primary)'}">
+    <div class="rr-in"><b>${p}%</b><span>${esc(label)}</span></div>
+  </div>`;
+}
+function viewAdminAnalytics() {
+  const a = state.analytics;
+  if (!a) return loadingHTML('Loading analytics…');
+  const rq = a.requests || {}, ap = a.appointments || {}, st = a.students || {};
+  const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  const byDay = ((a.trends && a.trends.byWeekday) || []).map(x => ({ label: days[x.d] !== undefined ? days[x.d] : x.d, value: x.c }));
+  const byHour = ((a.trends && a.trends.byHour) || []).map(x => ({ label: String(x.h).padStart(2, '0'), value: x.c }));
+  const grades = (st.byGrade || []).map(x => ({ label: x.label, value: x.c }));
+  const months = ((a.trends && a.trends.byMonth) || []).map(x => ({ label: x.month, value: x.c }));
+  return `
+  <div class="page-head">
+    <div><h2>Analytics</h2>
+      <div class="sub">Performance of requests, appointments and the queue — live from the database</div></div>
+    <button class="btn btn-sm btn-ghost" onclick="printReport('summary')">🖨 Print summary</button>
+  </div>
+
+  <div class="stat-grid">
+    <div class="stat-card green"><div class="sic">✅</div><div class="n">${rq.completionRate || 0}%</div><div class="l">Completion rate</div></div>
+    <div class="stat-card"><div class="sic">⏱</div><div class="n">${rq.avgTurnaroundH || 0}h</div><div class="l">Avg. turnaround</div></div>
+    <div class="stat-card gold"><div class="sic">🕓</div><div class="n">${rq.backlog || 0}</div><div class="l">Backlog (&gt; 2 days)</div></div>
+    <div class="stat-card"><div class="sic">📥</div><div class="n">${rq.today || 0}</div><div class="l">Filed today</div></div>
+    <div class="stat-card"><div class="ic">📅</div><div class="n">${ap.showRate || 0}%</div><div class="l">Appointment show rate</div></div>
+  </div>
+
+  <div class="grid-2">
+    <div class="panel">
+      <div class="panel-title">How requests finish</div>
+      <div class="ring-row">
+        ${rateRing(rq.completionRate, 'completed', 'var(--success)')}
+        ${rateRing(rq.within24hRate, 'within 24h', 'var(--accent)')}
+        ${rateRing(rq.rejectionRate, 'rejected', 'var(--danger)')}
+      </div>
+      <div class="muted small mt-8">${rq.completed || 0} of ${rq.total || 0} requests completed ·
+        ${rq.claimed || 0} scanned at the counter ·
+        avg. claim window ${rq.avgClaimWindowH || 0}h</div>
+      <hr class="hr">
+      <div class="panel-title">Volume</div>
+      <div class="kv"><span class="k">Filed today</span><span class="v">${rq.today || 0}</span></div>
+      <div class="kv"><span class="k">Filed last 7 days</span><span class="v">${rq.week || 0}</span></div>
+      <div class="kv"><span class="k">Appointments pending</span><span class="v">${ap.pending || 0}</span></div>
+      <div class="kv"><span class="k">Students on record</span><span class="v">${st.total || 0}</span></div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-title">Requests by weekday</div>
+      ${byDay.length ? barChart(byDay, 'var(--primary)') : '<div class="empty">No data yet.</div>'}
+      <hr class="hr">
+      <div class="panel-title">Requests by hour of day</div>
+      ${byHour.length ? barChart(byHour, 'var(--accent)') : '<div class="empty">No data yet.</div>'}
+    </div>
+  </div>
+
+  <div class="grid-2">
+    <div class="panel">
+      <div class="panel-title">Monthly trend (6 months)</div>
+      ${months.length ? barChart(months, 'var(--primary-bright)') : '<div class="empty">No data yet.</div>'}
+    </div>
+    <div class="panel">
+      <div class="panel-title">Students by grade level</div>
+      ${grades.length ? barChart(grades, 'var(--success)') : '<div class="empty">No data yet.</div>'}
+    </div>
+  </div>
+
+  <div class="grid-2">
+    <div class="panel">
+      <div class="panel-title">Most requested documents</div>
+      ${((a.top || {}).documents || []).length ? barChart(a.top.documents.map(x => ({ label: x.label, value: x.c })), 'var(--accent-deep)')
+        : '<div class="empty">No data yet.</div>'}
+    </div>
+    <div class="panel">
+      <div class="panel-title">Most active requesters</div>
+      ${((a.top || {}).students || []).length ? barChart(a.top.students.map(x => ({ label: x.label, value: x.c })), 'var(--info)')
+        : '<div class="empty">No data yet.</div>'}
+    </div>
+  </div>`;
+}
+
 /* ---------------- ACTIVITY LOGS ---------------- */
 function viewAdminLogs() {
   const logs = state.logs || [];
+  const f = state.logFilter || {};
+  const fx = state.logFacets || { actions: [], total: 0 };
+  const active = !!(f.search || f.action || f.from || f.to);
   return `
-  <div class="page-head"><h2>System Activity Logs</h2></div>
-  ${logs.length === 0 ? '<div class="card empty">No activity recorded yet.</div>' : `
+  <div class="page-head">
+    <div><h2>System Activity Logs</h2>
+      <div class="sub">${logs.length} shown · ${fx.total || 0} recorded</div></div>
+    <div class="flex">
+      <button class="btn btn-sm btn-outline" onclick="window.open('/api/export/logs','_blank','noopener')"
+        title="Download every entry as CSV">⬇ CSV</button>
+      <button class="btn btn-sm btn-ghost" onclick="printLogs()" title="Print the entries shown">🖨 Print</button>
+    </div>
+  </div>
+  <div class="filters">
+    <input class="input" id="lg-search" placeholder="Search user, action or details…"
+      value="${esc(f.search || '')}" oninput="setLogFilter('search', this.value, true)">
+    <select class="input" onchange="setLogFilter('action', this.value)">
+      <option value="">All actions</option>
+      ${(fx.actions || []).map(a => `<option value="${esc(a.action)}" ${f.action === a.action ? 'selected' : ''}>${esc(a.action)} (${a.c})</option>`).join('')}
+    </select>
+    <input class="input" type="date" title="From" aria-label="From date"
+      value="${esc(f.from || '')}" onchange="setLogFilter('from', this.value)">
+    <input class="input" type="date" title="To" aria-label="To date"
+      value="${esc(f.to || '')}" onchange="setLogFilter('to', this.value)">
+    ${active ? `<button class="btn btn-sm btn-ghost" onclick="clearLogFilter()">✕ Clear</button>` : ''}
+  </div>
+  ${logs.length === 0 ? `<div class="card empty"><div class="big">≡</div>${active ? 'No entries match these filters.' : 'No activity recorded yet.'}</div>` : `
   <div class="table-wrap"><table class="rtable">
     <thead><tr><th>Time</th><th>User</th><th>Action</th><th>Details</th></tr></thead>
     <tbody>${logs.map(l => `
@@ -441,12 +551,36 @@ function viewAdminLogs() {
 function viewAdminReports() {
   const r = state.reports;
   if (!r) return loadingHTML('Loading reports…');
+  const rr = state.reportRange || { from: '', to: '' };
   const apptColors = {
     Pending: 'var(--warning)', Approved: 'var(--info)', Confirmed: 'var(--info)',
     Completed: 'var(--success)', Cancelled: 'var(--danger)', Rejected: 'var(--danger)'
   };
   return `
-  <div class="page-head"><h2>Reports</h2></div>
+  <div class="page-head">
+    <div><h2>Reports</h2><div class="sub">Charts, analytics and printable official copies</div></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-title">🖨 Printable reports</div>
+    <div class="form-row">
+      <div class="field"><label for="rp-from">From</label>
+        <input class="input" type="date" id="rp-from" value="${esc(rr.from || '')}"
+          onchange="setReportRange('from', this.value)"></div>
+      <div class="field"><label for="rp-to">To</label>
+        <input class="input" type="date" id="rp-to" value="${esc(rr.to || '')}"
+          onchange="setReportRange('to', this.value)"></div>
+    </div>
+    <div class="muted small" style="margin-bottom:10px;">
+      The date range applies to the requests, appointments and roster sheets (leave both empty for everything).
+    </div>
+    <div class="quick-grid">
+      <button class="quick-tile" onclick="printReport('summary')"><span class="ic">📊</span>Summary</button>
+      <button class="quick-tile" onclick="printReport('requests')"><span class="ic">▤</span>Requests</button>
+      <button class="quick-tile" onclick="printReport('appointments')"><span class="ic">📅</span>Appointments</button>
+      <button class="quick-tile" onclick="printReport('students')"><span class="ic">👥</span>Students</button>
+    </div>
+  </div>
 
   <div class="grid-2">
     <div class="panel">

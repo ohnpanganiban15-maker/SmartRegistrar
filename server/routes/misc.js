@@ -92,10 +92,101 @@ router.get('/reports', requireAuth, requireAdmin, (req, res) => {
   res.json({ appointmentsByStatus, requestsByStatus, appointmentsByMonth, requestsByMonth, topServices, topDocuments });
 });
 
-/* GET /api/logs — admin: activity log */
+/* GET /api/analytics — admin: KPIs for the analytics dashboard.
+   Every number is derived from data that already exists — no new tables. */
+router.get('/analytics', requireAuth, requireAdmin, (req, res) => {
+  const one = sql => q.get(sql) || {};
+  const num = v => (v === null || v === undefined || isNaN(v)) ? 0 : Number(v);
+  const total = num(one('SELECT COUNT(*) c FROM document_requests').c);
+  const completed = num(one("SELECT COUNT(*) c FROM document_requests WHERE status='Completed'").c);
+  const rejected = num(one("SELECT COUNT(*) c FROM document_requests WHERE status IN ('Rejected','Cancelled')").c);
+  const backlog = num(one(`SELECT COUNT(*) c FROM document_requests
+    WHERE status IN ('Pending','Processing') AND created_at < datetime('now','-2 days')`).c);
+  const today = num(one("SELECT COUNT(*) c FROM document_requests WHERE date(created_at)=date('now')").c);
+  const week = num(one("SELECT COUNT(*) c FROM document_requests WHERE created_at >= date('now','-7 days')").c);
+  const claimed = num(one("SELECT COUNT(*) c FROM document_requests WHERE claimed_at != ''").c);
+  const within24 = num(one(`SELECT COUNT(*) c FROM document_requests
+    WHERE claimed_at != '' AND status='Completed'
+      AND (julianday(updated_at) - julianday(claimed_at)) <= 1`).c);
+
+  const apptTotal = num(one('SELECT COUNT(*) c FROM appointments').c);
+  const apptShown = num(one("SELECT COUNT(*) c FROM appointments WHERE status IN ('Completed','Confirmed','Approved')").c);
+  const apptLost = num(one("SELECT COUNT(*) c FROM appointments WHERE status IN ('Cancelled','Rejected')").c);
+
+  res.json({
+    requests: {
+      total, completed, rejected, backlog, today, week, claimed,
+      completionRate: total ? Math.round(completed / total * 100) : 0,
+      rejectionRate: total ? Math.round(rejected / total * 100) : 0,
+      avgTurnaroundH: num(one(`SELECT ROUND(AVG((julianday(updated_at) - julianday(created_at)) * 24), 1) h
+        FROM document_requests WHERE status='Completed'`).h),
+      avgClaimWindowH: num(one(`SELECT ROUND(AVG((julianday(updated_at) - julianday(claimed_at)) * 24), 1) h
+        FROM document_requests WHERE claimed_at != '' AND status='Completed'`).h),
+      within24hRate: claimed ? Math.round(within24 / claimed * 100) : 0
+    },
+    appointments: {
+      total: apptTotal, shown: apptShown, lost: apptLost,
+      showRate: apptTotal ? Math.round(apptShown / apptTotal * 100) : 0,
+      pending: num(one("SELECT COUNT(*) c FROM appointments WHERE status='Pending'").c)
+    },
+    students: {
+      total: num(one('SELECT COUNT(*) c FROM students').c),
+      byGrade: q.all(`SELECT CASE WHEN grade_level='' THEN 'Unset' ELSE 'Grade ' || grade_level END label,
+        COUNT(*) c FROM students GROUP BY grade_level ORDER BY label`)
+    },
+    trends: {
+      byWeekday: q.all(`SELECT CAST(strftime('%w', created_at) AS INTEGER) d, COUNT(*) c
+        FROM document_requests GROUP BY d ORDER BY d`),
+      byHour: q.all(`SELECT CAST(strftime('%H', created_at) AS INTEGER) h, COUNT(*) c
+        FROM document_requests GROUP BY h ORDER BY h`),
+      byMonth: q.all(`SELECT strftime('%Y-%m', created_at) month, COUNT(*) c
+        FROM document_requests WHERE created_at >= date('now','-6 months')
+        GROUP BY month ORDER BY month`)
+    },
+    top: {
+      documents: q.all('SELECT doc_type label, COUNT(*) c FROM document_requests GROUP BY doc_type ORDER BY c DESC LIMIT 6'),
+      students: q.all(`SELECT student_name label, COUNT(*) c FROM document_requests
+        GROUP BY student_name ORDER BY c DESC LIMIT 5`),
+      services: q.all(`SELECT service label, COUNT(*) c FROM appointments
+        GROUP BY service ORDER BY c DESC LIMIT 5`)
+    }
+  });
+});
+
+/* GET /api/logs — admin: activity log, searchable + filterable
+   ?search=  matches user, action or details
+   ?action=  exact action code (e.g. REQUEST_COMPLETED)
+   ?from= ?to=   inclusive date range (YYYY-MM-DD)                */
+function logWhere(qs) {
+  const where = [], params = [];
+  const s = String(qs.search || '').trim();
+  if (s) {
+    where.push('(user_name LIKE ? OR action LIKE ? OR details LIKE ?)');
+    const l = '%' + s + '%';
+    params.push(l, l, l);
+  }
+  const a = String(qs.action || '').trim();
+  if (a) { where.push('action = ?'); params.push(a); }
+  const f = String(qs.from || '').trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(f)) { where.push('created_at >= ?'); params.push(f + ' 00:00:00'); }
+  const t = String(qs.to || '').trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(t)) { where.push("created_at < date(?, '+1 day')"); params.push(t); }
+  return { sql: where.length ? ' WHERE ' + where.join(' AND ') : '', params };
+}
 router.get('/logs', requireAuth, requireAdmin, (req, res) => {
-  const limit = Math.min(200, parseInt(req.query.limit || '100', 10) || 100);
-  res.json(q.all('SELECT * FROM activity_logs ORDER BY id DESC LIMIT ?', limit));
+  const limit = Math.min(500, parseInt(req.query.limit || '100', 10) || 100);
+  const w = logWhere(req.query);
+  res.json(q.all('SELECT * FROM activity_logs' + w.sql +
+    ' ORDER BY id DESC LIMIT ?', ...w.params, limit));
+});
+
+/* GET /api/logs/facets — admin: filter chips (action codes + users, with counts) */
+router.get('/logs/facets', requireAuth, requireAdmin, (req, res) => {
+  res.json({
+    actions: q.all('SELECT action, COUNT(*) c FROM activity_logs GROUP BY action ORDER BY c DESC'),
+    users: q.all('SELECT user_name, COUNT(*) c FROM activity_logs GROUP BY user_name ORDER BY c DESC LIMIT 20'),
+    total: q.get('SELECT COUNT(*) c FROM activity_logs').c
+  });
 });
 
 /* ---- CSV export (admin) ---- */
@@ -137,27 +228,64 @@ router.post('/backup', requireAuth, requireAdmin, (req, res) => {
 });
 
 /* GET /api/qr/lookup?code=APT-0001 | REQ-0001 | STU-12
-   Used by the QR scanner. Returns only non-sensitive fields. */
+   Used by the QR scanner. Returns only non-sensitive fields plus an
+   enhanced verification verdict (valid / in-window / expired / completed). */
+function hoursLeft(stamp) {
+  const end = Date.parse(String(stamp).replace(' ', 'T') + 'Z') + 24 * 3600 * 1000;
+  if (isNaN(end)) return 0;
+  return Math.max(0, Math.round((end - Date.now()) / 360000) / 10);
+}
 router.get('/qr/lookup', requireAuth, (req, res) => {
   const code = String(req.query.code || '').trim().toUpperCase();
   if (!code) return res.status(400).json({ error: 'No code provided' });
+  const today = new Date().toISOString().slice(0, 10);
 
   if (code.startsWith('APT-')) {
     const a = q.get('SELECT * FROM appointments WHERE ref=?', code);
     if (!a) return res.status(404).json({ error: 'No appointment found for ' + code });
+    let verify;
+    if (['Cancelled', 'Rejected'].includes(a.status)) {
+      verify = { verdict: 'INVALID', tone: 'bad', message: 'This appointment was ' + a.status.toLowerCase() + '.' };
+    } else if (a.status === 'Completed') {
+      verify = { verdict: 'COMPLETED', tone: 'muted', message: 'Appointment already completed.' };
+    } else if (a.date < today) {
+      verify = { verdict: 'EXPIRED', tone: 'warn', message: 'The scheduled date (' + a.date + ') has passed.' };
+    } else {
+      verify = {
+        verdict: 'VALID', tone: 'ok',
+        message: a.status === 'Pending'
+          ? 'Valid — awaiting registrar approval.'
+          : 'Valid — confirmed for ' + a.date + ' at ' + a.start_time + '.'
+      };
+    }
     return res.json({
       type: 'appointment', ref: a.ref, name: a.student_name, service: a.service,
-      date: a.date, time: a.start_time, status: a.status
+      date: a.date, time: a.start_time, status: a.status, verify
     });
   }
   if (code.startsWith('REQ-')) {
     const r = q.get('SELECT * FROM document_requests WHERE ref=?', code);
     if (!r) return res.status(404).json({ error: 'No request found for ' + code });
+    let verify;
+    if (r.status === 'Completed') {
+      verify = { verdict: 'COMPLETED', tone: 'muted', message: 'Already claimed — this request is completed.' };
+    } else if (['Rejected', 'Cancelled'].includes(r.status)) {
+      verify = { verdict: 'INVALID', tone: 'bad', message: 'This request was ' + r.status.toLowerCase() + '.' };
+    } else if (r.claimed_at && hoursLeft(r.claimed_at) > 0) {
+      verify = {
+        verdict: 'IN_WINDOW', tone: 'ok',
+        message: 'Claim window running — auto-completes in ' + hoursLeft(r.claimed_at) + 'h.'
+      };
+    } else if (r.claimed_at) {
+      verify = { verdict: 'EXPIRED', tone: 'warn', message: 'The 24-hour claim window has ended — completion is imminent.' };
+    } else {
+      verify = { verdict: 'VALID', tone: 'ok', message: 'Request is ' + r.status + ' — no claim window yet.' };
+    }
     return res.json({
       type: 'document_request', ref: r.ref, name: r.student_name, service: r.doc_type,
       quantity: r.quantity, purpose: r.purpose || '',
       date: r.pickup_date || r.created_at.slice(0, 10), time: r.pickup_time || '', status: r.status,
-      id: r.id, claimed_at: r.claimed_at || ''
+      id: r.id, claimed_at: r.claimed_at || '', verify
     });
   }
   if (code.startsWith('STU-')) {
@@ -165,10 +293,13 @@ router.get('/qr/lookup', requireAuth, (req, res) => {
     const s = q.get('SELECT student_number, first_name, last_name, grade_level, strand, status FROM students WHERE student_number=? OR CAST(id AS TEXT)=?',
       num, num);
     if (!s) return res.status(404).json({ error: 'No student found for ' + code });
+    const verify = s.status === 'active'
+      ? { verdict: 'VALID', tone: 'ok', message: 'Enrolled student — identity verified.' }
+      : { verdict: 'INVALID', tone: 'bad', message: 'This student record is marked ' + s.status + '.' };
     return res.json({
       type: 'student', ref: code, name: s.first_name + ' ' + s.last_name,
       service: (s.grade_level ? 'Grade ' + s.grade_level + ' ' : '') + s.strand,
-      date: s.student_number, time: 'ID', status: s.status
+      date: s.student_number, time: 'ID', status: s.status, verify
     });
   }
   res.status(400).json({ error: 'Unrecognized code format' });

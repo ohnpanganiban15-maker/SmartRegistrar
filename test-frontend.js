@@ -302,7 +302,7 @@ const evalA = expr => w.eval(expr);
 
   /* --- cycle every student view --- */
   const studentViews = ['availability', 'myRequests', 'myAppointments', 'notifications',
-    'service', 'myQr', 'profile', 'announcements', 'dashboard'];
+    'service', 'myQr', 'profile', 'announcements', 'assistant', 'dashboard'];
   for (const v of studentViews) {
     await w.eval(`go('${v}')`);
     await sleep(150);
@@ -310,6 +310,43 @@ const evalA = expr => w.eval(expr);
     assert(htmlNow.length > 800 && !htmlNow.includes('Display error'),
       'view renders: ' + v + ' (' + htmlNow.length + ' chars)');
   }
+
+  /* --- virtual registrar assistant: knowledge-base answers --- */
+  await w.eval(`go('assistant')`);
+  await sleep(150);
+  assert($app().includes('Virtual Registrar Assistant'), 'assistant screen renders');
+  assert(w.document.getElementById('asst-input') !== null, 'assistant has a text input');
+  assert(w.document.querySelectorAll('.asst-chips .chip').length >= 4,
+    'assistant offers quick-question chips');
+  evalA(`assistantAsk('How do I track my request?')`);
+  await sleep(80);
+  {
+    const msgs = w.document.querySelectorAll('#asst-thread .asst-msg');
+    assert(msgs.length === 2 && /History/.test(msgs[1].textContent),
+      'assistant answers a tracking question from its knowledge base');
+    assert(!!w.document.querySelector('#asst-thread .asst-msg.me'),
+      'the user question is rendered as my own message');
+    assert(!!w.document.querySelector('#asst-thread .asst-msg .btn'),
+      'the answer carries a shortcut action button');
+  }
+  evalA(`assistantAsk('zzqqxxvvbbnn mmkkjjhhgg')`);
+  await sleep(80);
+  {
+    const msgs = w.document.querySelectorAll('#asst-thread .asst-msg');
+    const last = msgs[msgs.length - 1];
+    assert(/not sure about that one/i.test(last.textContent),
+      'unknown question falls back to the help message');
+    assert(/Talk to a person/i.test(last.textContent),
+      'fallback offers the human Customer Service route');
+  }
+  /* the form input drives the same flow */
+  w.document.getElementById('asst-input').value = 'What do I need to request a document?';
+  evalA(`assistantSend({ preventDefault: () => {} })`);
+  await sleep(80);
+  assert(/Form 137|LRN|purpose/i.test(w.document.getElementById('asst-thread').textContent),
+    'typed questions reach the assistant through the form');
+  assert(w.document.getElementById('asst-input').value === '',
+    'the assistant input clears after sending');
 
   /* --- pickup schedule (read-only, no booking) --- */
   await w.eval(`go('availability')`);
@@ -351,7 +388,8 @@ const evalA = expr => w.eval(expr);
 
   /* --- cycle every admin view --- */
   const adminViews = ['adminStudents', 'adminAppointments', 'adminRequests', 'adminAvailability',
-    'adminScanner', 'adminAnnouncements', 'adminService', 'adminReports', 'adminLogs', 'adminDashboard'];
+    'adminScanner', 'adminAnnouncements', 'adminService', 'adminReports', 'adminAnalytics',
+    'adminLogs', 'adminDashboard'];
   for (const v of adminViews) {
     await w.eval(`go('${v}')`);
     await sleep(200);
@@ -388,6 +426,11 @@ const evalA = expr => w.eval(expr);
   await sleep(250);
   assert($app().includes(apptF.ref) && $app().includes('Sensitive student details'),
     'manual QR lookup shows transaction details');
+  assert(!!w.document.querySelector('#scan-result .verify-badge'),
+    'QR lookup renders a verification verdict badge');
+  assert(/VALID|EXPIRED|COMPLETED|INVALID|IN_WINDOW/.test(
+    w.document.getElementById('scan-result').textContent),
+    'verdict code is shown to the registrar');
 
   /* --- admin: pickup schedule management UI --- */
   await w.eval(`go('adminAvailability')`);
@@ -496,6 +539,7 @@ const evalA = expr => w.eval(expr);
     const res = w.document.getElementById('scan-result');
     const txt = res ? res.textContent : '';
     assert(/claim window running/i.test(txt), 'second scan reports the window already running');
+    assert(/IN_WINDOW/.test(txt), 'second scan verdict flips to IN_WINDOW');
     assert((await rowOf(reqF.id)).claimed_at === stamp1,
       'second scan does not restart the 24-hour clock');
   }
@@ -503,6 +547,71 @@ const evalA = expr => w.eval(expr);
   await sleep(300);
   assert(/auto-complete/.test($app()), 'requests table shows the auto-complete countdown');
   assert($app().includes('editPickup'), 'a ready request still offers the editable pickup cell');
+
+  /* --- admin: activity log search / filter / print --- */
+  await w.eval(`go('adminLogs')`);
+  await sleep(300);
+  assert(w.document.getElementById('lg-search') !== null, 'activity log has a search box');
+  assert($app().includes('All actions'), 'activity log has an action filter');
+  assert($app().includes('QR_CLAIM_SCAN'), 'the QR scan from this run is in the log');
+  evalA(`setLogFilter('action', 'QR_CLAIM_SCAN')`);
+  await sleep(350);
+  {
+    const cells = [...w.document.querySelectorAll('.rtable tbody tr')]
+      .map(tr => tr.textContent);
+    assert(cells.length > 0 && cells.every(t => t.includes('QR_CLAIM_SCAN')),
+      'action filter narrows the table (' + cells.length + ' rows)');
+  }
+  evalA(`setLogFilter('search', 'zzz-no-such-entry')`);
+  await sleep(350);
+  assert($app().includes('No entries match these filters.'),
+    'an unmatched search shows the empty state');
+  evalA(`clearLogFilter()`);
+  await sleep(350);
+  assert(w.document.querySelectorAll('.rtable tbody tr').length > 0,
+    'clearing filters restores the full log');
+  evalA(`printLogs()`);
+  await sleep(120);
+  {
+    const pa = w.document.getElementById('print-area');
+    const txt = pa ? pa.textContent : '';
+    assert(!!pa && /System Activity Log/.test(txt) && /Entries:/.test(txt),
+      'printLogs fills the print sheet with the log');
+    assert(!!pa && pa.querySelector('.sheet-table'),
+      'the printable log is a proper table');
+  }
+
+  /* --- admin: analytics dashboard --- */
+  await w.eval(`go('adminAnalytics')`);
+  await sleep(400);
+  assert($app().includes('Analytics') && $app().includes('Completion rate'),
+    'analytics KPI cards render');
+  assert(w.document.querySelectorAll('.rate-ring').length >= 3,
+    'analytics shows the performance rate rings');
+  assert($app().includes('Requests by weekday') && $app().includes('Most requested documents'),
+    'analytics charts render');
+
+  /* --- admin: printable reports --- */
+  await w.eval(`go('adminReports')`);
+  await sleep(300);
+  assert($app().includes('Printable reports'), 'reports page offers printable sheets');
+  await w.eval(`printReport('requests')`);
+  await sleep(400);
+  {
+    const pa = w.document.getElementById('print-area');
+    const txt = pa ? pa.textContent : '';
+    assert(!!pa && /Document Requests Report/.test(txt),
+      'printable requests report generated');
+    assert(!!pa && txt.includes(reqF.ref), 'the report carries the real request rows');
+  }
+  await w.eval(`printReport('summary')`);
+  await sleep(500);
+  {
+    const pa = w.document.getElementById('print-area');
+    const txt = pa ? pa.textContent : '';
+    assert(/Registrar Summary/.test(txt) && /Completion rate|Completed/.test(txt),
+      'printable summary report generated from live analytics');
+  }
 
   /* --- theme toggle + persistence --- */
   evalA(`toggleTheme()`);
@@ -535,6 +644,25 @@ const evalA = expr => w.eval(expr);
     assert(!!note && note.textContent.includes(wantTime),
       'note shows the claim time (' + wantTime + ')');
   }
+
+  /* --- advanced tracking: the student expands the request timeline --- */
+  {
+    const histBtn = w.document.getElementById('tl-btn-' + reqF.id);
+    assert(!!histBtn, 'student request card offers a History button');
+    await w.eval(`toggleTimeline(${reqF.id}, document.getElementById('tl-btn-${reqF.id}'))`);
+    await sleep(200);
+    const box = w.document.getElementById('tl-' + reqF.id);
+    const txt = box ? box.textContent : '';
+    assert(!!box && /Request submitted/.test(txt), 'timeline shows the submission step');
+    assert(/QR scanned/i.test(txt), 'timeline shows the QR scan / claim window step');
+    assert(!!box && box.querySelectorAll('.tl-item').length >= 3,
+      'timeline lists every recorded step (' + (box ? box.querySelectorAll('.tl-item').length : 0) + ')');
+    /* collapse it again */
+    await w.eval(`toggleTimeline(${reqF.id}, document.getElementById('tl-btn-${reqF.id}'))`);
+    await sleep(150);
+    assert(w.document.getElementById('tl-' + reqF.id).innerHTML === '',
+      'history collapses on the second tap');
+  }
   w.eval(`logout()`);
   await sleep(120);
 
@@ -559,6 +687,19 @@ const evalA = expr => w.eval(expr);
     const still = await rowOf(reqF.id);
     assert(still.pickup_date === day5 && still.pickup_time === '14:00',
       'the locked pickup date + time are untouched');
+  }
+  /* the registrar opens the same history as a modal */
+  evalA(`showTimeline(${reqF.id})`);
+  await sleep(700);
+  {
+    const body = w.document.getElementById('tl-modal');
+    const txt = body ? body.textContent : '';
+    assert(!!body && /Request submitted/.test(txt), 'admin timeline modal renders the history');
+    assert(/QR scanned/i.test(txt), 'admin timeline shows the QR scan step');
+    assert(/Completed/.test(txt), 'admin timeline shows the completion step');
+    evalA(`closeModal()`);
+    await sleep(100);
+    assert(w.document.getElementById('tl-modal') === null, 'timeline modal closes');
   }
   w.eval(`logout()`);
   await sleep(120);

@@ -48,6 +48,57 @@ function initials(name) {
   return String(name || '?').split(/\s+/).map(w => w[0]).slice(0, 2).join('').toUpperCase();
 }
 
+/* ---------- printing (reports, logs, rosters) ---------- */
+/* fills (or creates) the print-only container, then asks the browser
+   to print. The container is emptied after the print job so the live
+   screen never shows it. */
+function printArea(html) {
+  let el = document.getElementById('print-area');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'print-area';
+    document.body.appendChild(el);
+  }
+  el.innerHTML = html;
+  const clear = () => { if (el) el.innerHTML = ''; };
+  try { window.addEventListener('afterprint', clear, { once: true }); } catch (e) {}
+  try { if (typeof window.print === 'function') window.print(); } catch (e) {}
+  setTimeout(clear, 2500);
+}
+
+/* a print-ready sheet: school header, meta row, table, footer */
+function reportHTML(opts) {
+  const o = opts || {};
+  const head = o.head || [];
+  const rows = o.rows || [];
+  const meta = o.meta || [];
+  const now = new Date();
+  return `
+  <div class="sheet">
+    <div class="sheet-head">
+      <img class="sheet-logo" src="assets/logo.jpg" alt="">
+      <div class="sheet-titles">
+        <div class="sheet-school">CDLSHS — Smart Registrar</div>
+        <div class="sheet-title">${esc(o.title || 'Report')}</div>
+        <div class="sheet-sub">${esc(o.subtitle || '')}</div>
+      </div>
+      <div class="sheet-when">
+        <div>Printed ${now.toLocaleString('en-US')}</div>
+        <div>by ${esc(o.by || '—')}</div>
+      </div>
+    </div>
+    ${meta.length ? `<div class="sheet-meta">${meta.map(m =>
+      `<span><b>${esc(m.label)}</b> ${esc(String(m.value))}</span>`).join('')}</div>` : ''}
+    ${rows.length === 0 ? '<div class="sheet-empty">No records for this selection.</div>' : `
+    <table class="sheet-table">
+      <thead><tr>${head.map(h => `<th>${esc(h)}</th>`).join('')}</tr></thead>
+      <tbody>${rows.map(r => `<tr>${r.map(c =>
+        `<td>${esc(c === null || c === undefined || c === '' ? '—' : String(c))}</td>`).join('')}</tr>`).join('')}</tbody>
+    </table>`}
+    <div class="sheet-foot">CDLSHS Smart Registrar · ${esc(o.title || 'Report')} · generated automatically</div>
+  </div>`;
+}
+
 /* ---- 24-hour claim window helpers --------------------------------
    stamp = UTC "YYYY-MM-DD HH:MM:SS" written by the server when the
    registrar scans the request's QR. The window ends 24h later. */

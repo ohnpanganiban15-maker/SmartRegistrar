@@ -310,6 +310,15 @@ function viewDashboard() {
     <div class="muted mt-8">No pickup schedule posted yet — check back soon.</div>
   </div>`}
 
+  <div class="panel asst-promo">
+    <div class="flex-between">
+      <div><b>🤖 Need help?</b>
+        <div class="muted small">Ask the virtual registrar assistant — instant answers about requests,
+        schedules, QR codes and your account.</div></div>
+      <button class="btn btn-sm btn-primary" onclick="go('assistant')">Ask now</button>
+    </div>
+  </div>
+
   ${anns.length ? `<div class="panel"><div class="panel-title">Announcements</div>
     ${anns.map(a => annHTML(a)).join('')}
     ${state.anns.length > 2 ? '<button class="btn btn-sm btn-ghost" onclick="go(\'announcements\')">See all announcements</button>' : ''}
@@ -453,9 +462,11 @@ function viewMyRequests() {
       <div class="flex mt-14">
         <button class="btn btn-sm btn-primary" onclick="Chat.openThread(${r.id})">💬 Chat</button>
         <button class="btn btn-sm btn-outline" onclick="showQr('${esc(r.ref)}')">Show QR</button>
+        <button class="btn btn-sm btn-ghost" id="tl-btn-${r.id}" onclick="toggleTimeline(${r.id}, this)">🕘 History</button>
         ${['Pending', 'Processing'].includes(r.status) ? `
           <button class="btn btn-sm btn-danger" onclick="cancelRequest(${r.id})">Cancel</button>` : ''}
       </div>
+      <div class="tl-wrap" id="tl-${r.id}" data-open="0"></div>
     </div>`).join('')}`;
 }
 
@@ -514,6 +525,54 @@ function viewService() {
 
   ${anns.length ? `<div class="panel"><div class="panel-title">Registrar Announcements</div>
     ${anns.map(a => annHTML(a)).join('')}</div>` : ''}`;
+}
+
+/* ---------------- VIRTUAL REGISTRAR ASSISTANT ---------------- */
+function viewAssistant() {
+  const thread = state.assistant || [];
+  const chips = [
+    'What do I need to request a document?',
+    'How do I book an appointment?',
+    'How do I track my request?',
+    'I forgot my password',
+    'When can I claim my document?',
+    'Talk to a person'
+  ];
+  return `
+  <div class="page-head">
+    <div><h2>Virtual Registrar Assistant</h2>
+      <div class="sub">Instant answers about requests, appointments, QR codes and your account</div></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-title">🤖 CDLSHS Assistant</div>
+    <div class="asst-thread" id="asst-thread">
+      ${thread.length === 0 ? `
+        <div class="asst-msg bot">
+          <div class="asst-av">🤖</div>
+          <div class="asst-bubble">Hi! I'm the virtual registrar assistant. Ask me anything about
+            document requests, appointments, QR codes or your account — or pick a question below.</div>
+        </div>` : thread.map(m => `
+        <div class="asst-msg ${m.who === 'me' ? 'me' : 'bot'}">
+          ${m.who === 'me' ? '' : '<div class="asst-av">🤖</div>'}
+          <div class="asst-bubble">${esc(m.text)}
+            ${m.action ? `<div class="mt-8"><button class="btn btn-sm btn-primary"
+              onclick="${esc(m.action.js)}">${esc(m.action.label)}</button></div>` : ''}</div>
+        </div>`).join('')}
+    </div>
+
+    <div class="asst-chips">
+      ${chips.map(c => `<button class="chip" onclick="assistantAsk(${JSON.stringify(c).replace(/"/g, '&quot;')})">${esc(c)}</button>`).join('')}
+    </div>
+
+    <form class="asst-form" onsubmit="assistantSend(event)">
+      <input class="input" id="asst-input" placeholder="Type your question…"
+        autocomplete="off" aria-label="Ask the assistant">
+      <button class="btn btn-primary" type="submit">Ask</button>
+    </form>
+    <div class="form-hint">Answers come from the registrar's own guide. For anything personal,
+      use <b>Customer Service</b> to talk to a real person.</div>
+  </div>`;
 }
 
 /* ---------------- MY QR ---------------- */
