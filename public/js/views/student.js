@@ -319,6 +319,14 @@ function viewDashboard() {
     </div>
   </div>
 
+  <div class="panel fb-promo">
+    <div class="flex-between">
+      <div><b>⭐ Rate our service</b>
+        <div class="muted small">How was your experience with the registrar? It only takes 10 seconds.</div></div>
+      <button class="btn btn-sm btn-accent" onclick="openFeedback()">Rate now</button>
+    </div>
+  </div>
+
   ${anns.length ? `<div class="panel"><div class="panel-title">Announcements</div>
     ${anns.map(a => annHTML(a)).join('')}
     ${state.anns.length > 2 ? '<button class="btn btn-sm btn-ghost" onclick="go(\'announcements\')">See all announcements</button>' : ''}
@@ -421,6 +429,11 @@ function viewMyAppointments() {
       <div class="mt-8"><b>${esc(a.service)}</b></div>
       <div class="muted small">${fmtDate(a.date)} · ${timeRange(a.start_time, a.end_time)}</div>
       ${a.purpose ? `<div class="small mt-8">“${esc(a.purpose)}”</div>` : ''}
+      ${a.queue_no && !['Cancelled', 'Rejected'].includes(a.status) ? `
+        <div class="q-badge">🎫 Queue #${a.queue_no}${a.queue_state === 'serving'
+          ? ' · <b>Now serving — please proceed to the counter</b>'
+          : a.queue_state === 'served' ? ' · Served' : ' · Waiting'}</div>` : ''}
+      ${a.no_show ? '<div class="small mt-8">⚠️ Marked as a no-show by the registrar.</div>' : ''}
       <div class="flex mt-14">
         <button class="btn btn-sm btn-outline" onclick="showQr('${esc(a.ref)}')">Show QR</button>
         ${['Pending', 'Approved'].includes(a.status) ? `

@@ -17,6 +17,7 @@ function purge() {
     'DELETE FROM messages;' +
     'DELETE FROM document_requests;' +
     'DELETE FROM appointments;' +
+    'DELETE FROM feedback;' +
     "DELETE FROM users WHERE role='student';" +
     'DELETE FROM students;'
   );

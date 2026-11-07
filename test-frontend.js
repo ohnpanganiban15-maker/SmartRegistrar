@@ -71,6 +71,8 @@ const evalA = expr => w.eval(expr);
     db.exec("DELETE FROM announcements WHERE title='Dashboard Panel Fixture'");
     db.prepare("INSERT INTO announcements (title, body) VALUES (?,?)")
       .run('Dashboard Panel Fixture', 'Fixture announcement for the dashboard panel test.');
+    /* P2 fixture type: remove leftovers so the requirements-manager test starts clean */
+    db.exec("DELETE FROM document_types WHERE name='FE Fixture Type'");
     db.close();
   }
   await sleep(400); /* let boot() finish */
@@ -348,6 +350,55 @@ const evalA = expr => w.eval(expr);
   assert(w.document.getElementById('asst-input').value === '',
     'the assistant input clears after sending');
 
+  /* --- P2: request form shows the document requirements --- */
+  await w.eval(`go('myRequests')`);
+  await sleep(200);
+  evalA(`openRequestForm()`);
+  await sleep(80);
+  {
+    const info = w.document.getElementById('rf-info');
+    assert(!!info && info.textContent.includes('Fee:'), 'request form renders the requirements panel');
+    assert(info.textContent.includes('Processing:'), 'requirements panel shows the processing time');
+    const sel = w.document.getElementById('rf-type');
+    assert(sel.options.length >= 6, 'document type dropdown lists every type (' + sel.options.length + ')');
+    /* switching the type refreshes the panel with that type's content */
+    sel.value = 'Diploma';
+    evalA(`showReqInfo()`);
+    await sleep(50);
+    assert(/Diploma|certifying/i.test(w.document.getElementById('rf-info').textContent) &&
+      w.document.getElementById('rf-info').textContent.includes('Fee:'),
+      'changing the document type updates the requirements panel');
+  }
+  evalA(`closeModal()`);
+
+  /* --- P2: student feedback modal (stars + validation) --- */
+  await w.eval(`go('dashboard')`);
+  await sleep(200);
+  assert($app().includes('Rate now'), 'dashboard offers the Rate-now feedback panel');
+  evalA(`openFeedback()`);
+  await sleep(80);
+  assert(w.document.getElementById('fb-stars') !== null &&
+    w.document.querySelectorAll('#fb-stars .star').length === 5,
+    'feedback modal renders 5 stars');
+  evalA(`submitFeedback()`);
+  await sleep(80);
+  assert(/Pick a star rating first/.test(w.document.getElementById('fb-error').textContent),
+    'submitting without a rating shows a validation error');
+  evalA(`pickStar(4)`);
+  await sleep(30);
+  assert(w.document.querySelectorAll('#fb-stars .star.on').length === 4,
+    'picking 4 stars highlights exactly 4');
+  w.document.getElementById('fb-comment').value = 'Frontend feedback test — mabilis!';
+  evalA(`submitFeedback()`);
+  await sleep(300);
+  assert(w.document.getElementById('fb-stars') === null, 'feedback modal closes after a valid submit');
+  {
+    const mine = await w.eval(`Api.get('/api/feedback/mine')`);
+    assert(Array.isArray(mine) && mine.length >= 1 &&
+      mine.some(f => f.rating === 4 && /Frontend feedback test/.test(f.comment)),
+      'the 4-star rating is persisted for this student');
+  }
+
   /* --- pickup schedule (read-only, no booking) --- */
   await w.eval(`go('availability')`);
   await sleep(200);
@@ -389,7 +440,7 @@ const evalA = expr => w.eval(expr);
   /* --- cycle every admin view --- */
   const adminViews = ['adminStudents', 'adminAppointments', 'adminRequests', 'adminAvailability',
     'adminScanner', 'adminAnnouncements', 'adminService', 'adminReports', 'adminAnalytics',
-    'adminLogs', 'adminDashboard'];
+    'adminDocTypes', 'adminQueue', 'adminLogs', 'adminDashboard'];
   for (const v of adminViews) {
     await w.eval(`go('${v}')`);
     await sleep(200);
@@ -403,6 +454,100 @@ const evalA = expr => w.eval(expr);
   await sleep(200);
   assert($app().includes('Approve'), 'admin appointments: approve button shown for pending');
   assert(!$app().includes('Reject</button>'), 'admin appointments: reject button removed');
+
+  /* --- P2: improved appointments (bulk approve, queue column, no-show) --- */
+  assert($app().includes('Approve all pending'), 'appointments head offers one-tap bulk approval');
+  assert($app().includes('Queue board'), 'appointments head links to the digital queue board');
+  assert(!!$app().match(/<th>Queue<\/th>/), 'appointments table has a Queue column');
+  assert($app().includes('markNoShow('), 'active appointments offer a no-show action');
+
+  /* --- P2: digital queue board (call → served) --- */
+  assert(!!apptF && apptF.date, 'queue fixture appointment carries its date');
+  await w.eval(`setQueueDate('${apptF.date}')`);
+  await sleep(350);
+  assert($app().includes('NOW SERVING'), 'queue board renders the Now Serving panel');
+  assert($app().includes(apptF.ref), 'queue board lists the booking for that date');
+  assert($app().includes('waiting'), 'queue board shows the waiting counter');
+  evalA(`queueAction(${apptF.id}, 'call')`);
+  await sleep(400);
+  assert(!$app().includes('Nobody called yet'), 'calling flips the Now Serving panel to the student');
+  assert($app().includes('Now serving'), 'called row is stamped Now serving');
+  assert(!!w.document.querySelector('tr.row-serving'), 'the serving row is highlighted');
+  evalA(`queueAction(${apptF.id}, 'served')`);
+  await sleep(400);
+  {
+    const list = await w.eval(`Api.get('/api/appointments')`);
+    const row = list.find(a => a.id === apptF.id);
+    assert(!!row && row.queue_state === 'served' && row.status === 'Completed',
+      'served marks the queue done + appointment completed');
+  }
+
+  /* --- P2: requirements manager (create → edit → disable → student blocked) --- */
+  await w.eval(`go('adminDocTypes')`);
+  await sleep(300);
+  assert($app().includes('Document Requirements'), 'requirements manager renders');
+  assert($app().includes('Certificate of Enrollment'), 'requirements table lists existing types');
+  assert($app().includes('Processing'), 'requirements table shows the processing column');
+  evalA(`openTypeForm()`);
+  await sleep(60);
+  assert(w.document.getElementById('dt-name') !== null, 'add-type modal opens');
+  w.document.getElementById('dt-name').value = 'FE Fixture Type';
+  w.document.getElementById('dt-desc').value = 'Frontend fixture document';
+  w.document.getElementById('dt-req').value = '• Purpose of request\n• Valid school ID';
+  w.document.getElementById('dt-fee').value = '₱40';
+  w.document.getElementById('dt-days').value = '3';
+  evalA(`saveType(null)`);
+  await sleep(450);
+  assert($app().includes('FE Fixture Type'), 'new document type appears in the table');
+  {
+    const list = await w.eval(`Api.get('/api/requests/types')`);
+    const t = list.find(x => x.name === 'FE Fixture Type');
+    assert(!!t && t.fee === '₱40' && Number(t.processing_days) === 3 && t.is_active === 1,
+      'created type persisted with fee + processing days');
+    /* edit it */
+    evalA(`openTypeForm(${t.id})`);
+    await sleep(60);
+    w.document.getElementById('dt-fee').value = '₱55';
+    evalA(`saveType(${t.id})`);
+    await sleep(450);
+    const after = (await w.eval(`Api.get('/api/requests/types')`)).find(x => x.id === t.id);
+    assert(!!after && after.fee === '₱55', 'edited fee saved');
+    /* disable (never delete) */
+    evalA(`toggleType(${t.id})`);
+    await sleep(450);
+    assert($app().includes('FE Fixture Type'), 'disabled type stays visible to the registrar');
+    assert(!!w.document.querySelector('tr.row-off'), 'disabled row is greyed out');
+    const disabled = (await w.eval(`Api.get('/api/requests/types')`)).find(x => x.id === t.id);
+    assert(!!disabled && disabled.is_active === 0, 'type disabled instead of deleted');
+    /* re-enable so the row leaves a clean state */
+    evalA(`toggleType(${t.id})`);
+    await sleep(450);
+    const re = (await w.eval(`Api.get('/api/requests/types')`)).find(x => x.id === t.id);
+    assert(!!re && re.is_active === 1, 'type re-enabled');
+  }
+
+  /* --- P2: approve-all uses the pending fixture path --- */
+  await w.eval(`go('adminAppointments')`);
+  await sleep(250);
+  evalA(`approveAllAppts()`);
+  await sleep(450);
+  {
+    const list = await w.eval(`Api.get('/api/appointments')`);
+    assert(list.every(a => a.status !== 'Pending'), 'no pending appointment survives approve-all');
+  }
+
+  /* --- P2: analytics feedback panel (rating submitted by the student earlier) --- */
+  await w.eval(`go('adminAnalytics')`);
+  await sleep(450);
+  assert($app().includes('Student feedback'), 'analytics renders the feedback panel');
+  assert(w.document.querySelectorAll('.fb-bar').length === 5,
+    'feedback distribution shows all 5 star levels');
+  {
+    const avgEl = w.document.querySelector('.fb-avg b');
+    const avg = avgEl ? parseFloat(avgEl.textContent) : 0;
+    assert(avg >= 1 && avg <= 5, 'feedback average rendered (' + avg + ')');
+    assert($app().includes('Frontend feedback test'), 'latest comments carry the real comment');
+  }
 
   /* --- admin: search filter keeps rendering --- */
   await w.eval(`go('adminStudents')`);

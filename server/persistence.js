@@ -25,7 +25,7 @@ const { db, q, migrateDocTypes } = require('./db');
 const TABLES = [
   'app_meta', 'students', 'users', 'appointment_slots', 'appointments', 'document_types',
   'document_requests', 'notifications', 'messages', 'announcements',
-  'request_messages', 'activity_logs', 'otps'
+  'request_messages', 'activity_logs', 'otps', 'feedback'
 ];
 
 /* ---------- snapshot build / apply ---------- */

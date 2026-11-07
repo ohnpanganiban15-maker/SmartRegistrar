@@ -1559,6 +1559,78 @@ html[data-theme="dark"] .bottom-nav {
 .vt-muted .vb-verdict { color:var(--muted); }
 
 /* =====================================================
+   P2 — document requirements manager
+   ===================================================== */
+.req-info {
+  margin-top:9px; padding:10px 12px; border-radius:9px;
+  background:var(--primary-pale, #E8F1FB); border:1px solid var(--border);
+  font-size:12.5px; line-height:1.55;
+}
+.ri-desc { color:var(--muted); margin-bottom:6px; }
+.ri-req b { color:var(--primary); }
+.ri-list { white-space:pre-line; margin-top:3px; }
+.ri-meta { display:flex; gap:14px; flex-wrap:wrap; margin-top:8px; padding-top:7px; border-top:1px dashed var(--border); }
+.row-off td { opacity:.5; }
+
+/* =====================================================
+   P2 — digital queue board
+   ===================================================== */
+.q-board { display:flex; gap:16px; flex-wrap:wrap; margin-bottom:16px; }
+.q-now {
+  flex:1 1 300px; background:linear-gradient(135deg, #0F4C81, #1B6FB5);
+  color:#fff; border-radius:14px; padding:18px 20px; text-align:center;
+  box-shadow:0 14px 30px -16px rgba(15,76,129,.7);
+}
+.q-now.q-idle { background:linear-gradient(135deg, #5A6B80, #7C8CA0); }
+.q-label { font-size:11.5px; letter-spacing:.18em; font-weight:700; opacity:.85; }
+.q-num { font-size:44px; font-weight:800; line-height:1.1; margin-top:4px; }
+.q-who { font-size:16px; font-weight:700; }
+.q-meta { font-size:12.5px; opacity:.85; margin-top:3px; }
+.q-stats { flex:0 0 auto; display:flex; gap:12px; align-items:stretch; }
+.q-stat {
+  min-width:92px; background:var(--surface); border:1px solid var(--border);
+  border-radius:12px; display:grid; place-items:center; padding:14px 12px;
+  text-align:center; box-shadow:var(--shadow-xs);
+}
+.q-stat b { font-size:26px; color:var(--primary); }
+.q-stat span { font-size:12px; color:var(--muted); text-transform:uppercase; letter-spacing:.06em; }
+.q-tag {
+  display:inline-grid; place-items:center; min-width:30px; height:30px; padding:0 7px;
+  background:var(--primary); color:#fff; border-radius:8px; font-size:14px;
+}
+.row-serving td { background:var(--primary-pale, #E8F1FB); }
+.q-badge {
+  display:inline-block; margin-top:8px; padding:5px 10px; border-radius:999px;
+  background:var(--primary-pale, #E8F1FB); color:var(--primary);
+  font-size:12.5px; font-weight:650; border:1px solid var(--border);
+}
+
+/* =====================================================
+   P2 — student feedback & ratings
+   ===================================================== */
+.fb-promo { border-left:4px solid var(--warning); }
+.star-row { display:flex; gap:8px; margin:10px 0 4px; }
+.star {
+  font-size:30px; line-height:1; background:none; border:none; cursor:pointer;
+  color:var(--border); transition:transform .12s, color .12s;
+}
+.star:hover { transform:scale(1.15); }
+.star.on { color:#F5B301; text-shadow:0 2px 8px rgba(245,179,1,.45); }
+.fb-row { display:flex; gap:18px; flex-wrap:wrap; align-items:center; }
+.fb-avg { text-align:center; min-width:96px; }
+.fb-avg b { font-size:38px; color:var(--primary); line-height:1; }
+.fb-avg .fb-stars { display:block; color:#F5B301; font-size:17px; letter-spacing:2px; }
+.fb-dist { flex:1 1 180px; display:grid; gap:5px; }
+.fb-bar { display:grid; grid-template-columns:34px 1fr 26px; gap:8px; align-items:center; font-size:12px; }
+.fb-star { color:var(--muted); text-align:right; }
+.fb-track { background:var(--surface-3, #F3F7FC); border:1px solid var(--border); border-radius:999px; height:9px; overflow:hidden; }
+.fb-track span { display:block; height:100%; background:linear-gradient(90deg, #F5B301, #FFD75E); }
+.fb-count { color:var(--muted); }
+.fb-cmt { padding:8px 0; border-bottom:1px dashed var(--border); font-size:13px; }
+.fb-cmt:last-child { border-bottom:none; }
+.fb-cmt b { color:#F5B301; }
+
+/* =====================================================
    Printable reports (official sheets + activity log)
    ===================================================== */
 #print-area { display:none; }

@@ -40,12 +40,16 @@ router.post('/', requireAuth, (req, res) => {
       { status: 409 }
     );
 
+    /* digital queue: every booking joins that day's queue in order */
+    const nextQ = q.get(
+      `SELECT COALESCE(MAX(queue_no),0) n FROM appointments
+       WHERE date=? AND status NOT IN ('Cancelled','Rejected')`, slot.date).n;
     const r = q.run(
-      `INSERT INTO appointments (ref, slot_id, student_id, student_name, service, purpose, date, start_time, end_time, status)
-       VALUES ('TMP',?,?,?,?,?,?,?,?, 'Pending')`,
+      `INSERT INTO appointments (ref, slot_id, student_id, student_name, service, purpose, date, start_time, end_time, status, queue_no)
+       VALUES ('TMP',?,?,?,?,?,?,?,?, 'Pending', ?)`,
       slot.id, student.id, student.first_name + ' ' + student.last_name,
       String(b.service).trim(), String(b.purpose || '').trim(),
-      slot.date, slot.start_time, slot.end_time
+      slot.date, slot.start_time, slot.end_time, Number(nextQ) + 1
     );
     const id = Number(r.lastInsertRowid);
     const ref = 'APT-' + String(id).padStart(4, '0');
@@ -58,7 +62,8 @@ router.post('/', requireAuth, (req, res) => {
   }
 
   notify(user.id, 'Appointment Submitted',
-    'Your appointment ' + created.ref + ' (' + created.date + ' ' + created.start_time + ') is awaiting approval.');
+    'Your appointment ' + created.ref + ' (' + created.date + ' ' + created.start_time + ') is awaiting approval.' +
+    (created.queue_no ? ' You are #' + created.queue_no + " in that day's queue." : ''));
   logActivity(req.user.id, req.user.name, 'BOOK_APPOINTMENT', created.ref);
   res.status(201).json(created);
 });
@@ -76,6 +81,44 @@ router.get('/', requireAuth, (req, res) => {
   if (to) { sql += ' AND date <= ?'; params.push(to); }
   sql += ' ORDER BY date DESC, start_time DESC, id DESC';
   res.json(q.all(sql, ...params));
+});
+
+/* GET /api/appointments/queue?date=YYYY-MM-DD — admin: digital queue board.
+   Returns the day's line-up split into waiting / now-serving / done. */
+router.get('/queue', requireAuth, (req, res) => {
+  if (req.user.role !== 'admin') return res.status(403).json({ error: 'Admin only' });
+  const d = String(req.query.date || '').trim();
+  const date = /^\d{4}-\d{2}-\d{2}$/.test(d) ? d : new Date().toISOString().slice(0, 10);
+  const rows = q.all(
+    `SELECT id, ref, student_name, service, start_time, end_time, status,
+            queue_no, queue_state, no_show, created_at
+     FROM appointments
+     WHERE date=? AND status NOT IN ('Cancelled','Rejected')
+     ORDER BY queue_no, id`, date);
+  res.json({
+    date,
+    rows,
+    waiting: rows.filter(r => !r.queue_state).length,
+    serving: rows.find(r => r.queue_state === 'serving') || null,
+    served: rows.filter(r => r.queue_state === 'served').length
+  });
+});
+
+/* POST /api/appointments/approve-all — admin: one-tap bulk approval */
+router.post('/approve-all', requireAuth, (req, res) => {
+  if (req.user.role !== 'admin') return res.status(403).json({ error: 'Admin only' });
+  const pending = q.all("SELECT * FROM appointments WHERE status='Pending'");
+  for (const a of pending) {
+    q.run("UPDATE appointments SET status='Approved', updated_at=datetime('now') WHERE id=?", a.id);
+    const studentUser = q.get('SELECT id FROM users WHERE student_id=?', a.student_id);
+    if (studentUser) {
+      notify(studentUser.id, 'Appointment Approved',
+        a.ref + ' (' + a.date + ' ' + a.start_time + ') is approved' +
+        (a.queue_no ? " — you are #" + a.queue_no + " in that day's queue." : '.'));
+    }
+  }
+  if (pending.length) logActivity(req.user.id, req.user.name, 'BULK_APPROVE', pending.length + ' appointment(s)');
+  res.json({ approved: pending.length });
 });
 
 /* PUT /api/appointments/:id/status — approve/reject/complete/cancel */
@@ -131,9 +174,14 @@ router.put('/:id/reschedule', requireAuth, (req, res) => {
     );
     if (taken) throw Object.assign(new Error('That slot is already taken'), { status: 409 });
 
+    /* moving to another day re-joins that day's queue at the end */
+    const nextQ = q.get(
+      `SELECT COALESCE(MAX(queue_no),0) n FROM appointments
+       WHERE date=? AND id!=? AND status NOT IN ('Cancelled','Rejected')`, slot.date, appt.id).n;
     q.run(
-      `UPDATE appointments SET slot_id=?, date=?, start_time=?, end_time=?, status='Pending', updated_at=datetime('now') WHERE id=?`,
-      slot.id, slot.date, slot.start_time, slot.end_time, appt.id
+      `UPDATE appointments SET slot_id=?, date=?, start_time=?, end_time=?, status='Pending',
+       queue_no=?, queue_state='', updated_at=datetime('now') WHERE id=?`,
+      slot.id, slot.date, slot.start_time, slot.end_time, Number(nextQ) + 1, appt.id
     );
     updated = q.get('SELECT * FROM appointments WHERE id=?', appt.id);
     db.exec('COMMIT');
@@ -149,6 +197,58 @@ router.put('/:id/reschedule', requireAuth, (req, res) => {
   }
   logActivity(req.user.id, req.user.name, 'RESCHEDULE', appt.ref + ' → ' + updated.date + ' ' + updated.start_time);
   res.json({ message: 'Appointment rescheduled', appointment: updated });
+});
+
+/* ---------- digital queue actions (registrar) ---------- */
+
+/* POST /api/appointments/:id/call — "Now serving": call the next student */
+router.post('/:id/call', requireAuth, (req, res) => {
+  if (req.user.role !== 'admin') return res.status(403).json({ error: 'Admin only' });
+  const a = q.get('SELECT * FROM appointments WHERE id=?', req.params.id);
+  if (!a) return res.status(404).json({ error: 'Appointment not found' });
+  if (['Cancelled', 'Rejected', 'Completed'].includes(a.status)) {
+    return res.status(409).json({ error: 'This appointment can no longer be called' });
+  }
+  q.run("UPDATE appointments SET queue_state='serving', updated_at=datetime('now') WHERE id=?", a.id);
+  logActivity(req.user.id, req.user.name, 'QUEUE_CALL', a.ref + (a.queue_no ? ' #' + a.queue_no : ''));
+  const studentUser = q.get('SELECT id FROM users WHERE student_id=?', a.student_id);
+  if (studentUser) notify(studentUser.id, 'Now Serving', a.ref + ' — please proceed to the registrar counter.');
+  res.json(q.get('SELECT * FROM appointments WHERE id=?', a.id));
+});
+
+/* POST /api/appointments/:id/served — student attended: queue done + completed */
+router.post('/:id/served', requireAuth, (req, res) => {
+  if (req.user.role !== 'admin') return res.status(403).json({ error: 'Admin only' });
+  const a = q.get('SELECT * FROM appointments WHERE id=?', req.params.id);
+  if (!a) return res.status(404).json({ error: 'Appointment not found' });
+  if (['Cancelled', 'Rejected'].includes(a.status)) {
+    return res.status(409).json({ error: 'This appointment cannot be marked as served' });
+  }
+  q.run(`UPDATE appointments SET queue_state='served', status='Completed',
+         updated_at=datetime('now') WHERE id=?`, a.id);
+  logActivity(req.user.id, req.user.name, 'QUEUE_SERVED', a.ref);
+  const studentUser = q.get('SELECT id FROM users WHERE student_id=?', a.student_id);
+  if (studentUser) notify(studentUser.id, 'Appointment Completed', a.ref + ' — thank you!');
+  res.json(q.get('SELECT * FROM appointments WHERE id=?', a.id));
+});
+
+/* POST /api/appointments/:id/noshow — student did not arrive */
+router.post('/:id/noshow', requireAuth, (req, res) => {
+  if (req.user.role !== 'admin') return res.status(403).json({ error: 'Admin only' });
+  const a = q.get('SELECT * FROM appointments WHERE id=?', req.params.id);
+  if (!a) return res.status(404).json({ error: 'Appointment not found' });
+  if (['Cancelled', 'Rejected', 'Completed'].includes(a.status)) {
+    return res.status(409).json({ error: 'This appointment is already closed' });
+  }
+  q.run(`UPDATE appointments SET no_show=1, queue_state='', status='Cancelled',
+         updated_at=datetime('now') WHERE id=?`, a.id);
+  logActivity(req.user.id, req.user.name, 'APPOINTMENT_NO_SHOW', a.ref);
+  const studentUser = q.get('SELECT id FROM users WHERE student_id=?', a.student_id);
+  if (studentUser) {
+    notify(studentUser.id, 'Appointment Missed',
+      a.ref + ' (' + a.date + ' ' + a.start_time + ') was marked as a no-show. You may book again.');
+  }
+  res.json(q.get('SELECT * FROM appointments WHERE id=?', a.id));
 });
 
 module.exports = router;

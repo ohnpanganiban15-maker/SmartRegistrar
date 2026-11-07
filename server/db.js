@@ -162,12 +162,22 @@ CREATE TABLE IF NOT EXISTS app_meta (
   value TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS feedback (
+  id           INTEGER PRIMARY KEY AUTOINCREMENT,
+  student_id   INTEGER NOT NULL REFERENCES students(id) ON DELETE CASCADE,
+  student_name TEXT NOT NULL DEFAULT '',
+  rating       INTEGER NOT NULL DEFAULT 5 CHECK(rating >= 1 AND rating <= 5),
+  comment      TEXT NOT NULL DEFAULT '',
+  created_at   TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
 CREATE INDEX IF NOT EXISTS idx_appt_slot     ON appointments(slot_id);
 CREATE INDEX IF NOT EXISTS idx_appt_student  ON appointments(student_id);
 CREATE INDEX IF NOT EXISTS idx_req_student   ON document_requests(student_id);
 CREATE INDEX IF NOT EXISTS idx_notif_user    ON notifications(user_id);
 CREATE INDEX IF NOT EXISTS idx_rmsg_request  ON request_messages(request_id);
 CREATE INDEX IF NOT EXISTS idx_slot_date     ON appointment_slots(date);
+CREATE INDEX IF NOT EXISTS idx_feedback_student ON feedback(student_id);
 `;
 
 db.exec(SCHEMA);
@@ -184,6 +194,16 @@ ensureColumn('users', 'token_version INTEGER NOT NULL DEFAULT 0');
 ensureColumn('students', "profile_photo TEXT NOT NULL DEFAULT ''");
 ensureColumn('document_requests', "pickup_time TEXT NOT NULL DEFAULT ''");
 ensureColumn('document_requests', "claimed_at TEXT NOT NULL DEFAULT ''");
+/* P2 — document requirements management */
+ensureColumn('document_types', "description TEXT NOT NULL DEFAULT ''");
+ensureColumn('document_types', "requirements TEXT NOT NULL DEFAULT ''");
+ensureColumn('document_types', "fee TEXT NOT NULL DEFAULT ''");
+ensureColumn('document_types', 'processing_days INTEGER NOT NULL DEFAULT 1');
+ensureColumn('document_types', 'is_active INTEGER NOT NULL DEFAULT 1');
+/* P2 — digital queue + no-show tracking */
+ensureColumn('appointments', 'queue_no INTEGER NOT NULL DEFAULT 0');
+ensureColumn('appointments', "queue_state TEXT NOT NULL DEFAULT ''");
+ensureColumn('appointments', 'no_show INTEGER NOT NULL DEFAULT 0');
 
 /* ---- ensure required document types exist (safe on old + fresh DBs) ---- */
 const insertDocType = db.prepare('INSERT OR IGNORE INTO document_types (name) VALUES (?)');
@@ -200,6 +220,64 @@ function migrateDocTypes() {
   db.prepare("UPDATE document_requests SET doc_type='Certified True Copy' WHERE doc_type='Certification'").run();
 }
 migrateDocTypes();
+
+/* ---- P2: assign queue numbers to existing appointments (additive backfill).
+   Only dates that still carry unassigned active rows are (re)numbered, in
+   stable id order — idempotent, never touches cancelled/rejected rows. ---- */
+{
+  const pendingDates = db.prepare(
+    "SELECT DISTINCT date FROM appointments WHERE queue_no=0 AND status NOT IN ('Cancelled','Rejected')"
+  ).all();
+  const renumber = db.prepare(
+    `UPDATE appointments SET queue_no = (
+       SELECT COUNT(*) FROM appointments b
+       WHERE b.date = ? AND b.id <= appointments.id
+         AND b.status NOT IN ('Cancelled','Rejected'))
+     WHERE date = ? AND status NOT IN ('Cancelled','Rejected')`);
+  for (const d of pendingDates) renumber.run(d.date, d.date);
+}
+
+/* ---- P2: starter content for the requirements manager.
+   Fills ONLY pristine rows (all new columns untouched) — once. Fees are
+   deliberately left blank for the registrar to set. ---- */
+const DOC_CONTENT = {
+  'Certificate of Enrollment': {
+    description: 'Official proof that a student is currently enrolled at CDLSHS.',
+    requirements: '• Submit the request through this app\n• State the purpose of the certificate\n• Claim at the counter with your QR code or school ID',
+    processing_days: 1
+  },
+  'Diploma': {
+    description: 'Document certifying that a student has completed the senior high school program.',
+    requirements: '• Written request with the purpose\n• Valid school ID\n• Claim only during the posted pickup hours',
+    processing_days: 3
+  },
+  'SF9': {
+    description: "Form 9 — the learner's progress report card copy.",
+    requirements: '• Indicate your grade level and section\n• State the purpose of the request',
+    processing_days: 1
+  },
+  'SF10': {
+    description: 'Form 10 — Certificate of Enrolment.',
+    requirements: '• Indicate your grade level and section\n• State the purpose of the request',
+    processing_days: 1
+  },
+  'Certified True Copy': {
+    description: 'Certified true copy of a school-issued document held on file.',
+    requirements: '• Present the original document to be certified\n• State the purpose\n• Valid school ID',
+    processing_days: 2
+  },
+  'Other Registrar Documents': {
+    description: 'Any other registrar document that is not listed above.',
+    requirements: '• Describe the document you need\n• State the purpose of the request',
+    processing_days: 2
+  }
+};
+{
+  const fill = db.prepare(
+    `UPDATE document_types SET description=?, requirements=?, processing_days=?
+     WHERE name=? AND description='' AND requirements='' AND fee='' AND processing_days=1`);
+  for (const [name, c] of Object.entries(DOC_CONTENT)) fill.run(c.description, c.requirements, c.processing_days, name);
+}
 
 /* ---- small query helpers used by all routes ---- */
 const q = {

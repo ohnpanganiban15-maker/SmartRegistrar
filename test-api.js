@@ -476,6 +476,125 @@ async function call(method, path, token, body) {
   assert(r.data.verify && r.data.verify.verdict === 'INVALID',
     'rejected request verifies as INVALID');
 
+  /* --- P2: document requirements management --- */
+  r = await call('GET', '/api/requests/types', admin);
+  assert(r.status === 200 && r.data.length >= 6, 'admin sees every document type (' + r.data.length + ')');
+  {
+    const eo = r.data.find(t => t.name === 'Certificate of Enrollment');
+    assert(!!eo && (eo.description || '').length > 10,
+      'starter description pre-filled: ' + (eo ? String(eo.description).slice(0, 38) : '?'));
+    assert(!!eo && /•/.test(eo.requirements || ''), 'starter requirements pre-filled');
+    assert(!!eo && Number(eo.processing_days) >= 1, 'processing_days pre-filled');
+    assert(!!eo && eo.fee === '', 'fee left blank for the registrar to set');
+  }
+  r = await call('GET', '/api/requests/types', student);
+  assert(r.status === 200 && r.data.length >= 6 && r.data.every(t => t.is_active === 1),
+    'students only receive active types (' + r.data.length + ')');
+
+  /* create (idempotent: a previous run may already own the row) */
+  r = await call('POST', '/api/requests/types', admin, {
+    name: 'P2 Test Type', description: 'Fixture requirements', requirements: '• Purpose\n• Valid ID',
+    fee: '₱25', processing_days: 2
+  });
+  assert(r.status === 201 || r.status === 409, 'admin can create a document type (HTTP ' + r.status + ')');
+  let p2Type = r.status === 201 ? r.data : null;
+  if (!p2Type) {
+    r = await call('GET', '/api/requests/types', admin);
+    p2Type = (r.data || []).find(t => t.name === 'P2 Test Type');
+  }
+  assert(!!p2Type && !!p2Type.id, 'P2 test type row is present');
+  r = await call('POST', '/api/requests/types', admin, { name: 'P2 Test Type' });
+  assert(r.status === 409, 'duplicate document type rejected');
+  r = await call('POST', '/api/requests/types', student, { name: 'Student-made type' });
+  assert(r.status === 403, 'student cannot create document types');
+
+  /* edit: fee + same-day processing (0 must survive the clamp) */
+  r = await call('PUT', `/api/requests/types/${p2Type.id}`, admin,
+    { fee: '₱50', processing_days: 0, description: 'Updated P2 description' });
+  assert(r.status === 200 && r.data.fee === '₱50' && r.data.processing_days === 0 &&
+    r.data.description === 'Updated P2 description',
+    'admin edits fee, same-day processing (0 kept) and description');
+  r = await call('PUT', `/api/requests/types/${p2Type.id}`, student, { fee: 'Free' });
+  assert(r.status === 403, 'student cannot edit a document type');
+
+  /* disable (never delete) */
+  r = await call('PUT', `/api/requests/types/${p2Type.id}`, admin, { is_active: false });
+  assert(r.status === 200 && r.data.is_active === 0, 'type disabled instead of deleted');
+  r = await call('GET', '/api/requests/types', student);
+  assert(r.status === 200 && !r.data.some(t => t.id === p2Type.id), 'disabled type hidden from students');
+  r = await call('POST', '/api/requests', student, { docType: 'P2 Test Type', quantity: 1, purpose: 'disabled type' });
+  assert(r.status === 400, 'requesting a disabled type is refused');
+  r = await call('POST', '/api/requests', student, { docType: 'Form 137', quantity: 1, purpose: 'legacy type' });
+  assert(r.status === 201, 'unknown legacy type still accepted (no regression)');
+  r = await call('PUT', `/api/requests/types/${p2Type.id}`, admin, { is_active: true });
+  assert(r.status === 200 && r.data.is_active === 1, 'type re-enabled for the next run');
+
+  /* --- P2: digital queue --- */
+  r = await call('GET', '/api/slots', student);
+  const freeQ = (r.data || []).find(s => !s.is_booked);
+  assert(!!freeQ, 'a free slot exists for the queue fixture');
+  r = await call('POST', '/api/appointments', student,
+    { slotId: freeQ.id, service: 'Certificate of Enrollment', purpose: 'Queue fixture' });
+  assert(r.status === 201 && Number(r.data.queue_no) >= 1,
+    'booking joins that day queue at #' + (r.data && r.data.queue_no));
+  const qId = r.data.id, qDate = r.data.date;
+
+  r = await call('GET', `/api/appointments/queue?date=${qDate}`, admin);
+  assert(r.status === 200 && Array.isArray(r.data.rows) && r.data.rows.some(x => x.id === qId),
+    'queue board lists the booking (' + r.data.waiting + ' waiting)');
+  r = await call('GET', `/api/appointments/queue?date=${qDate}`, student);
+  assert(r.status === 403, 'student cannot open the queue board');
+
+  r = await call('POST', `/api/appointments/${qId}/call`, admin, {});
+  assert(r.status === 200 && r.data.queue_state === 'serving', 'registrar calls the student (now serving)');
+  r = await call('GET', `/api/appointments/queue?date=${qDate}`, admin);
+  assert(r.data.serving && r.data.serving.id === qId, 'board shows who is now serving');
+  r = await call('POST', `/api/appointments/${qId}/call`, student, {});
+  assert(r.status === 403, 'student cannot call the queue');
+  r = await call('POST', `/api/appointments/${qId}/served`, admin, {});
+  assert(r.status === 200 && r.data.queue_state === 'served' && r.data.status === 'Completed',
+    'served → queue done + appointment completed');
+
+  /* no-show on a second booking */
+  r = await call('GET', '/api/slots', student);
+  const freeQ2 = (r.data || []).find(s => !s.is_booked);
+  assert(!!freeQ2, 'a second free slot exists for the no-show fixture');
+  r = await call('POST', '/api/appointments', student, { slotId: freeQ2.id, service: 'Other', purpose: 'No-show fixture' });
+  assert(r.status === 201, 'second booking created for the no-show fixture');
+  const nsId = r.data.id;
+  r = await call('POST', `/api/appointments/${nsId}/noshow`, student, {});
+  assert(r.status === 403, 'student cannot flag a no-show');
+  r = await call('POST', `/api/appointments/${nsId}/noshow`, admin, {});
+  assert(r.status === 200 && r.data.no_show === 1 && r.data.status === 'Cancelled',
+    'no-show flagged + appointment cancelled');
+
+  /* bulk approve */
+  r = await call('POST', '/api/appointments/approve-all', admin, {});
+  assert(r.status === 200 && typeof r.data.approved === 'number',
+    'bulk approve returns a count (' + r.data.approved + ')');
+  r = await call('POST', '/api/appointments/approve-all', student, {});
+  assert(r.status === 403, 'student cannot bulk approve');
+
+  /* --- P2: student feedback & ratings --- */
+  r = await call('POST', '/api/feedback', student, { rating: 5, comment: 'Mabilis at maayos!' });
+  assert(r.status === 201 && r.data.rating === 5, 'student sends 5-star feedback');
+  r = await call('POST', '/api/feedback', student, { rating: 9 });
+  assert(r.status === 400, 'rating above 5 refused');
+  r = await call('POST', '/api/feedback', student, { rating: 0 });
+  assert(r.status === 400, 'rating below 1 refused');
+  r = await call('POST', '/api/feedback', admin, { rating: 5 });
+  assert(r.status === 403, 'admin cannot post student feedback');
+  r = await call('GET', '/api/feedback/mine', student);
+  assert(r.status === 200 && r.data.length >= 1, 'student reads their own feedback');
+  r = await call('GET', '/api/feedback', admin);
+  assert(r.status === 200 && r.data.total >= 1 && r.data.avg >= 1 && r.data.avg <= 5 &&
+    r.data.dist.length === 5, 'admin sees average + distribution (' + r.data.avg + '★, ' + r.data.total + ' ratings)');
+  r = await call('GET', '/api/feedback', student);
+  assert(r.status === 403, 'student cannot read every rating');
+  r = await call('GET', '/api/analytics', admin);
+  assert(r.status === 200 && r.data.feedback && r.data.feedback.total >= 1 && r.data.feedback.avg >= 1,
+    'analytics carries the feedback KPI (' + r.data.feedback.total + ' @ ' + r.data.feedback.avg + ')');
+
   /* --- notifications read --- */
   r = await call('PUT', '/api/notifications/read-all', student);
   assert(r.status === 200, 'mark all notifications read');

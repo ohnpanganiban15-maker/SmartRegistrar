@@ -177,7 +177,11 @@ function viewAdminAppointments() {
   return `
   <div class="page-head">
     <div><h2>Appointment Management</h2><div class="sub">${list.length} appointment(s)</div></div>
-    
+    <div class="flex">
+      ${(state.appts || []).some(a => a.status === 'Pending') ? `
+        <button class="btn btn-sm btn-success" onclick="approveAllAppts()">✔ Approve all pending</button>` : ''}
+      <button class="btn btn-sm btn-ghost" onclick="go('adminQueue')" title="Digital queue board">🎫 Queue board</button>
+    </div>
   </div>
   <div class="filters">
     <input class="input" id="as-search" placeholder="Search ref, student, service…" value="${esc(f.search || '')}"
@@ -196,7 +200,7 @@ function viewAdminAppointments() {
   </div>
   ${list.length === 0 ? '<div class="card empty"><div class="big">🗓️</div>No appointments match.</div>' : `
   <div class="table-wrap"><table class="rtable">
-    <thead><tr><th>Ref</th><th>Student</th><th>Service</th><th>Date &amp; Time</th><th>Status</th><th>Actions</th></tr></thead>
+    <thead><tr><th>Ref</th><th>Student</th><th>Service</th><th>Date &amp; Time</th><th>Status</th><th>Queue</th><th>Actions</th></tr></thead>
     <tbody>${list.map(a => `
       <tr>
         <td data-label="Ref" class="mono">${esc(a.ref)}</td>
@@ -204,6 +208,9 @@ function viewAdminAppointments() {
         <td data-label="Service">${esc(a.service)}${a.purpose ? `<div class="muted small">“${esc(a.purpose)}”</div>` : ''}</td>
         <td data-label="Date & Time">${fmtDateShort(a.date)}<div class="muted small">${timeRange(a.start_time, a.end_time)}</div></td>
         <td data-label="Status">${stamp(a.status)}</td>
+        <td data-label="Queue" class="small">${a.queue_no && !['Cancelled', 'Rejected'].includes(a.status) ? '#' + a.queue_no : '—'}
+          ${a.queue_state === 'serving' ? '<span class="stamp st-approved">Serving</span>' : ''}
+          ${a.no_show ? '<span class="stamp st-cancelled">No-show</span>' : ''}</td>
         <td class="cell-actions" data-label="">
           <button class="btn btn-sm btn-ghost" onclick="showQr('${esc(a.ref)}')">QR</button>
           ${a.status === 'Pending' ? `
@@ -212,7 +219,8 @@ function viewAdminAppointments() {
             <button class="btn btn-sm btn-success" onclick="setApptStatus(${a.id},'Completed')">Complete</button>
             <button class="btn btn-sm btn-outline" onclick="openReschedule(${a.id})">Reschedule</button>` : ''}
           ${['Pending', 'Approved', 'Confirmed'].includes(a.status) ? `
-            <button class="btn btn-sm btn-danger" onclick="setApptStatus(${a.id},'Cancelled')">Cancel</button>` : ''}
+            <button class="btn btn-sm btn-danger" onclick="setApptStatus(${a.id},'Cancelled')">Cancel</button>
+            <button class="btn btn-sm btn-ghost" onclick="markNoShow(${a.id})" title="Student did not arrive">No-show</button>` : ''}
           ${['Completed', 'Cancelled', 'Rejected'].includes(a.status) ? '<span class="muted small">—</span>' : ''}
         </td>
       </tr>`).join('')}</tbody>
@@ -420,6 +428,166 @@ function viewAdminService() {
     </div>`).join('')}`;
 }
 
+/* ---------------- DOCUMENT REQUIREMENTS ---------------- */
+function viewAdminDocTypes() {
+  const types = state.docTypes || [];
+  return `
+  <div class="page-head">
+    <div><h2>Document Requirements</h2>
+      <div class="sub">${types.length} document type(s) · what students see before requesting</div></div>
+    <button class="btn btn-primary" onclick="openTypeForm()">+ Add document type</button>
+  </div>
+  ${types.length === 0 ? '<div class="card empty"><div class="big">📋</div>No document types yet.</div>' : `
+  <div class="table-wrap"><table class="rtable">
+    <thead><tr><th>Document</th><th>Description</th><th>Requirements</th><th>Fee</th>
+      <th>Processing</th><th>Status</th><th></th></tr></thead>
+    <tbody>${types.map(t => `
+      <tr${t.is_active ? '' : ' class="row-off"'}>
+        <td data-label="Document"><b>${esc(t.name)}</b></td>
+        <td data-label="Description" class="small">${esc(t.description || '—')}</td>
+        <td data-label="Requirements" class="small">${esc((t.requirements || '').split('\n')[0] || '—')}${(t.requirements || '').indexOf('\n') !== -1 ? ' …' : ''}</td>
+        <td data-label="Fee">${t.fee ? esc(t.fee) : '<span class="muted">—</span>'}</td>
+        <td data-label="Processing">${Number(t.processing_days) || 1} day(s)</td>
+        <td data-label="Status">${t.is_active
+          ? '<span class="stamp st-approved">Active</span>'
+          : '<span class="stamp st-cancelled">Disabled</span>'}</td>
+        <td class="cell-actions" data-label="">
+          <button class="btn btn-sm btn-outline" onclick="openTypeForm(${t.id})">Edit</button>
+          <button class="btn btn-sm btn-ghost" onclick="toggleType(${t.id})">${t.is_active ? 'Disable' : 'Enable'}</button>
+        </td>
+      </tr>`).join('')}</tbody>
+  </table></div>`}
+  <div class="form-hint">Types are disabled, never deleted — past requests keep their original document name.</div>`;
+}
+
+function openTypeForm(id) {
+  const t = id ? (state.docTypes || []).find(x => x.id === id) : null;
+  openModal(`
+    <div class="modal-head">
+      <div class="modal-title">${t ? 'Edit' : 'Add'} document type</div>
+      <button class="modal-x" onclick="closeModal()" aria-label="Close">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div id="dt-error"></div>
+      <div class="field"><label for="dt-name">Document name *</label>
+        <input class="input" id="dt-name" value="${esc(t ? t.name : '')}"
+          placeholder="e.g., Certificate of Good Character"></div>
+      <div class="field"><label for="dt-desc">Description</label>
+        <textarea class="input" id="dt-desc"
+          placeholder="One line students will read…">${esc(t ? t.description : '')}</textarea></div>
+      <div class="field"><label for="dt-req">Requirements (one per line)</label>
+        <textarea class="input" id="dt-req" rows="4"
+          placeholder="&#8226; Purpose of request&#10;&#8226; Valid school ID">${esc(t ? t.requirements : '')}</textarea></div>
+      <div class="form-row">
+        <div class="field"><label for="dt-fee">Fee</label>
+          <input class="input" id="dt-fee" value="${esc(t ? t.fee : '')}" placeholder="Free / ₱50"></div>
+        <div class="field"><label for="dt-days">Processing days</label>
+          <input class="input" id="dt-days" type="number" min="0" max="60"
+            value="${t ? (Number(t.processing_days) || 0) : 1}"></div>
+      </div>
+      ${t ? `<label class="check"><input type="checkbox" id="dt-active" ${t.is_active ? 'checked' : ''}>
+        Active — visible to students</label>` : ''}
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="saveType(${t ? t.id : 'null'})">${t ? 'Save changes' : 'Create type'}</button>
+    </div>`);
+}
+async function saveType(id) {
+  const g = x => ((document.getElementById(x) || {}).value || '').trim();
+  const body = {
+    name: g('dt-name'), description: g('dt-desc'),
+    requirements: g('dt-req'), fee: g('dt-fee')
+  };
+  const activeEl = document.getElementById('dt-active');
+  if (activeEl) body.is_active = activeEl.checked;
+  const days = parseInt(g('dt-days'), 10);
+  if (Number.isFinite(days)) body.processing_days = days;
+  if (!body.name) {
+    const e = document.getElementById('dt-error');
+    if (e) e.innerHTML = '<div class="error-box">Document name is required.</div>';
+    return;
+  }
+  try {
+    if (id) await Api.put('/api/requests/types/' + id, body);
+    else await Api.post('/api/requests/types', body);
+    closeModal();
+    toast(id ? 'Document type updated.' : 'Document type added.');
+    await loadView('adminDocTypes');
+    render();
+  } catch (err) {
+    const e = document.getElementById('dt-error');
+    if (e) e.innerHTML = '<div class="error-box">' + esc(err.message) + '</div>';
+  }
+}
+async function toggleType(id) {
+  const t = (state.docTypes || []).find(x => x.id === id);
+  if (!t) return;
+  try {
+    await Api.put('/api/requests/types/' + id, { is_active: !t.is_active });
+    toast(t.is_active ? t.name + ' disabled — students can no longer request it.'
+      : t.name + ' enabled.');
+    await loadView('adminDocTypes');
+    render();
+  } catch (err) { toast(err.message, 'error'); }
+}
+
+/* ---------------- DIGITAL QUEUE ---------------- */
+function viewAdminQueue() {
+  const qd = state.queue;
+  if (!qd) return loadingHTML('Loading the queue…');
+  const rows = qd.rows || [];
+  const now = qd.serving;
+  return `
+  <div class="page-head">
+    <div><h2>Digital Queue</h2>
+      <div class="sub">${fmtDate(qd.date)} · ${rows.length} in line</div></div>
+    <div class="flex">
+      <input class="input" type="date" value="${esc(qd.date)}" onchange="setQueueDate(this.value)"
+        aria-label="Queue date">
+      <button class="btn btn-sm btn-ghost" onclick="loadView('adminQueue').then(render)">↻ Refresh</button>
+    </div>
+  </div>
+
+  <div class="q-board">
+    <div class="q-now${now ? '' : ' q-idle'}">
+      <div class="q-label">NOW SERVING</div>
+      <div class="q-num">${now ? '#' + (now.queue_no || '—') : '—'}</div>
+      <div class="q-who">${now ? esc(now.student_name) : 'Nobody called yet'}</div>
+      <div class="q-meta">${now ? esc(now.service) + ' · ' + esc(now.ref)
+        : 'Call the next student from the list below.'}</div>
+    </div>
+    <div class="q-stats">
+      <div class="q-stat"><b>${qd.waiting || 0}</b><span>waiting</span></div>
+      <div class="q-stat"><b>${qd.served || 0}</b><span>served</span></div>
+      <div class="q-stat"><b>${rows.length}</b><span>total</span></div>
+    </div>
+  </div>
+
+  ${rows.length === 0 ? '<div class="card empty"><div class="big">🎫</div>No appointments in the queue for this date.</div>' : `
+  <div class="table-wrap"><table class="rtable">
+    <thead><tr><th>#</th><th>Student</th><th>Service</th><th>Schedule</th><th>State</th><th>Actions</th></tr></thead>
+    <tbody>${rows.map(a => `
+      <tr${a.queue_state === 'serving' ? ' class="row-serving"' : ''}>
+        <td data-label="#"><b class="q-tag">${a.queue_no || '—'}</b></td>
+        <td data-label="Student"><b>${esc(a.student_name)}</b>
+          <div class="muted small mono">${esc(a.ref)}</div></td>
+        <td data-label="Service">${esc(a.service)}</td>
+        <td data-label="Schedule" class="small">${fmtDateShort(a.date)} · ${fmtTime(a.start_time)}</td>
+        <td data-label="State">${a.queue_state === 'serving' ? '<span class="stamp st-approved">Now serving</span>'
+          : a.queue_state === 'served' ? '<span class="stamp st-completed">Served</span>'
+          : '<span class="stamp st-pending">Waiting</span>'}</td>
+        <td class="cell-actions" data-label="">
+          ${!a.queue_state ? `<button class="btn btn-sm btn-primary" onclick="queueAction(${a.id},'call')">Call</button>` : ''}
+          ${a.queue_state === 'serving' ? `
+            <button class="btn btn-sm btn-success" onclick="queueAction(${a.id},'served')">Served</button>
+            <button class="btn btn-sm btn-danger" onclick="queueAction(${a.id},'noshow')">No-show</button>` : ''}
+          ${a.queue_state === 'served' ? '<span class="muted small">Done</span>' : ''}
+        </td>
+      </tr>`).join('')}</tbody>
+  </table></div>`}`;
+}
+
 /* ---------------- ANALYTICS (admin) ---------------- */
 function rateRing(pct, label, color) {
   const p = Math.max(0, Math.min(100, Math.round(Number(pct) || 0)));
@@ -432,6 +600,7 @@ function viewAdminAnalytics() {
   const a = state.analytics;
   if (!a) return loadingHTML('Loading analytics…');
   const rq = a.requests || {}, ap = a.appointments || {}, st = a.students || {};
+  const fb = state.feedback || { rows: [], total: 0, avg: 0, dist: [] };
   const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
   const byDay = ((a.trends && a.trends.byWeekday) || []).map(x => ({ label: days[x.d] !== undefined ? days[x.d] : x.d, value: x.c }));
   const byHour = ((a.trends && a.trends.byHour) || []).map(x => ({ label: String(x.h).padStart(2, '0'), value: x.c }));
@@ -501,6 +670,29 @@ function viewAdminAnalytics() {
       <div class="panel-title">Most active requesters</div>
       ${((a.top || {}).students || []).length ? barChart(a.top.students.map(x => ({ label: x.label, value: x.c })), 'var(--info)')
         : '<div class="empty">No data yet.</div>'}
+    </div>
+  </div>
+
+  <div class="grid-2">
+    <div class="panel">
+      <div class="panel-title">⭐ Student feedback</div>
+      ${fb.total ? `
+      <div class="fb-row">
+        <div class="fb-avg"><b>${fb.avg}</b>
+          <span class="fb-stars">${'★'.repeat(Math.round(fb.avg))}${'☆'.repeat(5 - Math.round(fb.avg))}</span>
+          <div class="muted small">${fb.total} rating(s)</div></div>
+        <div class="fb-dist">${(fb.dist || []).slice().reverse().map(d => `
+          <div class="fb-bar"><span class="fb-star">${d.rating}★</span>
+            <span class="fb-track"><span style="width:${fb.total ? Math.round(d.c / fb.total * 100) : 0}%"></span></span>
+            <span class="fb-count">${d.c}</span></div>`).join('')}</div>
+      </div>` : '<div class="empty">No ratings yet — students can rate the service from their dashboard.</div>'}
+    </div>
+    <div class="panel">
+      <div class="panel-title">Latest comments</div>
+      ${(fb.rows || []).filter(x => x.comment).slice(0, 4).map(x => `
+        <div class="fb-cmt"><b>${'★'.repeat(x.rating)}</b> · ${esc(x.student_name)}
+          <div class="small">“${esc(x.comment)}”</div></div>`).join('')
+        || '<div class="empty">No comments yet.</div>'}
     </div>
   </div>`;
 }

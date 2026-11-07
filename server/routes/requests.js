@@ -33,9 +33,66 @@ function notify(userId, title, body, kind) {
     userId, title, body, kind || 'request');
 }
 
-/* GET /api/requests/types — public list of document types */
+/* GET /api/requests/types — public list of document types.
+   Students only see the active ones; the registrar sees everything
+   (including disabled types) for the requirements manager. */
 router.get('/types', requireAuth, (req, res) => {
-  res.json(q.all('SELECT * FROM document_types ORDER BY name'));
+  if (req.user.role === 'admin') {
+    return res.json(q.all('SELECT * FROM document_types ORDER BY is_active DESC, name'));
+  }
+  res.json(q.all('SELECT * FROM document_types WHERE is_active=1 ORDER BY name'));
+});
+
+function clampDays(v, fallback) {
+  const raw = parseInt(v, 10);
+  return Number.isFinite(raw) ? Math.max(0, Math.min(60, raw)) : fallback;
+}
+
+/* POST /api/requests/types — admin: add a document type with its requirements */
+router.post('/types', requireAuth, (req, res) => {
+  if (req.user.role !== 'admin') return res.status(403).json({ error: 'Admin only' });
+  const b = req.body || {};
+  if (!validateBody(res, b, ['name'])) return;
+  const name = String(b.name).trim();
+  if (name.length < 2) return res.status(400).json({ error: 'Document name is too short' });
+  if (q.get('SELECT id FROM document_types WHERE name=?', name)) {
+    return res.status(409).json({ error: 'That document type already exists' });
+  }
+  const r = q.run(
+    `INSERT INTO document_types (name, description, requirements, fee, processing_days, is_active)
+     VALUES (?,?,?,?,?,1)`,
+    name, String(b.description || '').trim(), String(b.requirements || '').trim(),
+    String(b.fee || '').trim(), clampDays(b.processing_days, 1)
+  );
+  logActivity(req.user.id, req.user.name, 'CREATE_DOC_TYPE', name);
+  res.status(201).json(q.get('SELECT * FROM document_types WHERE id=?', Number(r.lastInsertRowid)));
+});
+
+/* PUT /api/requests/types/:id — admin: edit requirements, fee, processing
+   time and the active flag (types are disabled, never deleted). */
+router.put('/types/:id', requireAuth, (req, res) => {
+  if (req.user.role !== 'admin') return res.status(403).json({ error: 'Admin only' });
+  const t = q.get('SELECT * FROM document_types WHERE id=?', req.params.id);
+  if (!t) return res.status(404).json({ error: 'Document type not found' });
+  const b = req.body || {};
+  const name = b.name !== undefined ? String(b.name).trim() : t.name;
+  if (name.length < 2) return res.status(400).json({ error: 'Document name is too short' });
+  if (q.get('SELECT id FROM document_types WHERE name=? AND id!=?', name, t.id)) {
+    return res.status(409).json({ error: 'That document type already exists' });
+  }
+  const active = b.is_active !== undefined ? (b.is_active ? 1 : 0) : t.is_active;
+  q.run(
+    `UPDATE document_types SET name=?, description=?, requirements=?, fee=?,
+     processing_days=?, is_active=? WHERE id=?`,
+    name,
+    b.description !== undefined ? String(b.description).trim() : t.description,
+    b.requirements !== undefined ? String(b.requirements).trim() : t.requirements,
+    b.fee !== undefined ? String(b.fee).trim() : t.fee,
+    b.processing_days !== undefined ? clampDays(b.processing_days, t.processing_days) : t.processing_days,
+    active, t.id
+  );
+  logActivity(req.user.id, req.user.name, 'UPDATE_DOC_TYPE', name + (active ? '' : ' (disabled)'));
+  res.json(q.get('SELECT * FROM document_types WHERE id=?', t.id));
 });
 
 /* POST /api/requests — student submits a request */
@@ -48,6 +105,11 @@ router.post('/', requireAuth, (req, res) => {
   }
   const student = q.get('SELECT * FROM students WHERE id=?', user.student_id);
   const qty = Math.max(1, Math.min(50, parseInt(b.quantity || '1', 10) || 1));
+  /* a type the registrar disabled can no longer be requested */
+  const knownType = q.get('SELECT is_active FROM document_types WHERE name=?', String(b.docType).trim());
+  if (knownType && !knownType.is_active) {
+    return res.status(400).json({ error: 'That document is currently not being offered — please choose another type.' });
+  }
 
   const r = q.run(
     `INSERT INTO document_requests (ref, student_id, student_name, doc_type, quantity, purpose, pickup_date, notes, status)

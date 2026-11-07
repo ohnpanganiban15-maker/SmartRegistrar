@@ -21,6 +21,7 @@ const state = {
   logFacets: null,
   reportRange: { from: '', to: '' },
   analytics: null,
+  queue: null, queueDate: '', feedback: null,
   unread: 0,
   pendingReq: 0,
   sidebarOpen: false,
@@ -43,7 +44,8 @@ const VIEWS = {
   adminAvailability: viewAdminAvailability, adminScanner: viewAdminScanner,
   adminAnnouncements: viewAdminAnnouncements, adminService: viewAdminService,
   adminLogs: viewAdminLogs, adminReports: viewAdminReports,
-  adminAnalytics: viewAdminAnalytics
+  adminAnalytics: viewAdminAnalytics,
+  adminDocTypes: viewAdminDocTypes, adminQueue: viewAdminQueue
 };
 
 function isAdminView(v) { return String(v).startsWith('admin'); }
@@ -112,6 +114,13 @@ async function loadView(view) {
       state.appts = await Api.get('/api/appointments'); return;
     case 'adminRequests':
       state.requests = await Api.get('/api/requests'); return;
+    case 'adminDocTypes':
+      state.docTypes = await Api.get('/api/requests/types'); return;
+    case 'adminQueue': {
+      if (!state.queueDate) state.queueDate = todayISO();
+      state.queue = await Api.get('/api/appointments/queue?date=' + encodeURIComponent(state.queueDate));
+      return;
+    }
     case 'adminAvailability':
       state.slots = await Api.get('/api/slots/all'); return;
     case 'adminScanner': return;
@@ -133,9 +142,9 @@ async function loadView(view) {
     case 'adminReports':
       state.reports = await Api.get('/api/reports'); return;
     case 'adminAnalytics': {
-      const [analytics, stats] = await Promise.all([
-        Api.get('/api/analytics'), Api.get('/api/dashboard/stats')]);
-      Object.assign(state, { analytics, stats }); return;
+      const [analytics, stats, feedback] = await Promise.all([
+        Api.get('/api/analytics'), Api.get('/api/dashboard/stats'), Api.get('/api/feedback')]);
+      Object.assign(state, { analytics, stats, feedback }); return;
     }
     case 'apptConfirmed': return;
   }
@@ -294,8 +303,9 @@ function adminShell(content) {
   const cur = state.view;
   const items = [
     ['adminDashboard', '⌂', 'Dashboard'], ['adminStudents', '👥', 'Students'],
-    ['adminRequests', '▤', 'Requests'],
-    ['adminAvailability', '◔', 'Pickup Schedule'], ['adminScanner', '▣', 'QR Scanner'],
+    ['adminRequests', '▤', 'Requests'], ['adminDocTypes', '📋', 'Requirements'],
+    ['adminAvailability', '◔', 'Pickup Schedule'], ['adminQueue', '🎫', 'Digital Queue'],
+    ['adminScanner', '▣', 'QR Scanner'],
     ['adminAnnouncements', '📢', 'Announcements'], ['adminService', '✉', 'Customer Service'],
     ['adminReports', '📊', 'Reports'], ['adminAnalytics', '📈', 'Analytics'],
     ['adminLogs', '≡', 'Activity Logs']
@@ -787,9 +797,10 @@ function openRequestForm() {
     <div class="modal-body">
       <div id="rf-error"></div>
       <div class="field"><label>Document type</label>
-        <select class="input" id="rf-type">
+        <select class="input" id="rf-type" onchange="showReqInfo()">
           ${types.map(t => `<option${p.docType === t.name ? ' selected' : ''}>${esc(t.name)}</option>`).join('')}
-        </select></div>
+        </select>
+        <div id="rf-info"></div></div>
       <div class="field"><label>Quantity</label>
         <input class="input" id="rf-qty" type="number" min="1" max="50" value="${p.quantity || 1}"></div>
       <div class="field"><label>Purpose *</label>
@@ -801,6 +812,27 @@ function openRequestForm() {
       <button class="btn btn-outline" onclick="closeModal()">Cancel</button>
       <button class="btn btn-primary" onclick="submitRequest()">Submit request</button>
     </div>`);
+  showReqInfo();
+}
+
+/* live requirements panel under the document-type selector */
+function showReqInfo() {
+  const el = document.getElementById('rf-info');
+  if (!el) return;
+  const sel = document.getElementById('rf-type');
+  const t = (state.docTypes || []).find(x => x.name === (sel ? sel.value : ''));
+  if (!t) { el.innerHTML = ''; return; }
+  const bits = [];
+  if (t.description) bits.push(`<div class="ri-desc">${esc(t.description)}</div>`);
+  if (t.requirements) {
+    bits.push(`<div class="ri-req"><b>What you need:</b>
+      <div class="ri-list">${esc(t.requirements)}</div></div>`);
+  }
+  bits.push(`<div class="ri-meta">
+    <span>Fee: <b>${t.fee ? esc(t.fee) : '—'}</b></span>
+    <span>Processing: <b>${Number(t.processing_days) || 1} working day(s)</b></span>
+  </div>`);
+  el.innerHTML = `<div class="req-info">${bits.join('')}</div>`;
 }
 
 /* step 1: validate the form, then show the confirmation summary */
@@ -1056,6 +1088,54 @@ async function setApptStatus(id, status) {
     await Api.put('/api/appointments/' + id + '/status', { status });
     toast('Appointment marked as ' + status + '.');
     await loadView(state.view);
+    render();
+  } catch (err) { toast(err.message, 'error'); }
+}
+
+/* P2 — improved appointments: bulk approval + no-show */
+async function approveAllAppts() {
+  try {
+    const r = await Api.post('/api/appointments/approve-all', {});
+    toast(r.approved ? r.approved + ' pending appointment(s) approved.' : 'No pending appointments to approve.');
+    await loadView(state.view);
+    render();
+  } catch (err) { toast(err.message, 'error'); }
+}
+async function markNoShow(id) {
+  const ok = await confirmDlg('Mark this appointment as a no-show? It will be cancelled and the student notified.', 'Mark no-show');
+  if (!ok) return;
+  try {
+    await Api.post('/api/appointments/' + id + '/noshow', {});
+    toast('Appointment marked as a no-show.');
+    await loadView(state.view);
+    render();
+  } catch (err) { toast(err.message, 'error'); }
+}
+
+/* P2 — digital queue board actions */
+async function setQueueDate(v) {
+  state.queueDate = v || todayISO();
+  try {
+    state.view = 'adminQueue';
+    await loadView('adminQueue');
+    render();
+  } catch (err) { toast(err.message, 'error'); }
+}
+async function queueAction(id, act) {
+  const labels = {
+    call: 'Calling the student to the counter…',
+    served: 'Marked as served — appointment completed.',
+    noshow: 'Marked as a no-show.'
+  };
+  if (act === 'noshow') {
+    const ok = await confirmDlg('Mark this student as a no-show?', 'Yes');
+    if (!ok) return;
+  }
+  try {
+    await Api.post('/api/appointments/' + id + '/' + act, {});
+    toast(labels[act] || 'Saved.');
+    state.view = 'adminQueue';
+    await loadView('adminQueue');
     render();
   } catch (err) { toast(err.message, 'error'); }
 }
@@ -1398,6 +1478,50 @@ function assistantSend(ev) {
   const q = el ? el.value : '';
   if (el) el.value = '';
   assistantAsk(q);
+}
+
+/* ---------- student feedback & ratings ---------- */
+let _fbRating = 0;
+function openFeedback() {
+  _fbRating = 0;
+  openModal(`
+    <div class="modal-head">
+      <div class="modal-title">⭐ Rate our service</div>
+      <button class="modal-x" onclick="closeModal()" aria-label="Close">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div id="fb-error"></div>
+      <p class="muted">How was your experience with the registrar's office? Your rating helps us improve.</p>
+      <div class="star-row" id="fb-stars">
+        ${[1, 2, 3, 4, 5].map(n => `<button type="button" class="star" data-n="${n}"
+          onclick="pickStar(${n})" aria-label="${n} star(s)">★</button>`).join('')}
+      </div>
+      <div class="field"><label for="fb-comment">Comments (optional)</label>
+        <textarea class="input" id="fb-comment"
+          placeholder="Tell us what went well or what we can improve…"></textarea></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="submitFeedback()">Submit rating</button>
+    </div>`);
+}
+function pickStar(n) {
+  _fbRating = n;
+  const stars = document.querySelectorAll('#fb-stars .star');
+  for (let i = 0; i < stars.length; i++) stars[i].classList.toggle('on', i < n);
+}
+async function submitFeedback() {
+  if (!_fbRating) {
+    const box = document.getElementById('fb-error');
+    if (box) box.innerHTML = '<div class="error-box">Pick a star rating first.</div>';
+    return;
+  }
+  try {
+    const c = document.getElementById('fb-comment');
+    await Api.post('/api/feedback', { rating: _fbRating, comment: c ? c.value : '' });
+    closeModal();
+    toast('Salamat for your ' + _fbRating + '-star rating! ⭐');
+  } catch (err) { toast(err.message, 'error'); }
 }
 
 /* ---------- admin: activity log filters ---------- */

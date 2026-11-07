@@ -149,8 +149,54 @@ router.get('/analytics', requireAuth, requireAdmin, (req, res) => {
         GROUP BY student_name ORDER BY c DESC LIMIT 5`),
       services: q.all(`SELECT service label, COUNT(*) c FROM appointments
         GROUP BY service ORDER BY c DESC LIMIT 5`)
-    }
+    },
+    feedback: (() => {
+      const f = q.get('SELECT COUNT(*) c, AVG(rating) a FROM feedback');
+      return { total: f && f.c ? f.c : 0, avg: f && f.a ? Math.round(f.a * 10) / 10 : 0 };
+    })()
   });
+});
+
+/* ---------- student feedback & ratings ---------- */
+
+/* POST /api/feedback — student rates the registrar's service (1–5) */
+router.post('/feedback', requireAuth, (req, res) => {
+  if (req.user.role !== 'student') {
+    return res.status(403).json({ error: 'Only students can send feedback' });
+  }
+  const b = req.body || {};
+  const rating = parseInt(b.rating, 10);
+  if (!Number.isFinite(rating) || rating < 1 || rating > 5) {
+    return res.status(400).json({ error: 'Choose a rating from 1 to 5 stars' });
+  }
+  const user = q.get('SELECT * FROM users WHERE id=?', req.user.id);
+  const student = user && user.student_id ? q.get('SELECT * FROM students WHERE id=?', user.student_id) : null;
+  if (!student) return res.status(404).json({ error: 'Student profile not found' });
+  const comment = String(b.comment || '').trim().slice(0, 500);
+  const r = q.run(
+    'INSERT INTO feedback (student_id, student_name, rating, comment) VALUES (?,?,?,?)',
+    student.id, student.first_name + ' ' + student.last_name, rating, comment
+  );
+  logActivity(req.user.id, req.user.name, 'SUBMIT_FEEDBACK', rating + ' star(s)');
+  res.status(201).json(q.get('SELECT * FROM feedback WHERE id=?', Number(r.lastInsertRowid)));
+});
+
+/* GET /api/feedback — admin: every rating with the average + distribution */
+router.get('/feedback', requireAuth, requireAdmin, (req, res) => {
+  const rows = q.all('SELECT * FROM feedback ORDER BY id DESC LIMIT 200');
+  const sum = rows.reduce((s, f) => s + f.rating, 0);
+  res.json({
+    rows,
+    total: rows.length,
+    avg: rows.length ? Math.round(sum / rows.length * 10) / 10 : 0,
+    dist: [1, 2, 3, 4, 5].map(n => ({ rating: n, c: rows.filter(r => r.rating === n).length }))
+  });
+});
+
+/* GET /api/feedback/mine — student: the ratings they sent */
+router.get('/feedback/mine', requireAuth, (req, res) => {
+  res.json(q.all('SELECT * FROM feedback WHERE student_id=? ORDER BY id DESC',
+    req.user.studentId || 0));
 });
 
 /* GET /api/logs — admin: activity log, searchable + filterable
