@@ -70,7 +70,7 @@ function seed() {
 
   /* ---- document types ---- */
   const docTypes = [
-    'Certificate of Enrollment', 'Diploma', 'SF9', 'SF10',
+    'Certificate of Enrollment', 'SF9', 'SF10',
     'Certified True Copy', 'Other Registrar Documents'
   ];
   for (const name of docTypes) q.run('INSERT OR IGNORE INTO document_types (name) VALUES (?)', name);
@@ -95,7 +95,7 @@ function seed() {
     const appts = [
       [studentIds[0], 'Certificate of Enrollment', 'Scholarship application', slotIds[0], 'Pending'],
       [studentIds[1], 'Certificate of Enrollment', 'College application', slotIds[3], 'Approved'],
-      [studentIds[2], 'Diploma', 'Job application of parent', slotIds[6], 'Completed'],
+      [studentIds[2], 'Certificate of Enrollment', 'Job application of parent', slotIds[6], 'Completed'],
       [studentIds[0], 'Certified True Copy', 'Transfer requirement', slotIds[10], 'Pending'],
       [studentIds[3], 'Certified True Copy', 'Scholarship requirement', slotIds[13], 'Approved']
     ];
@@ -112,7 +112,7 @@ function seed() {
     const requests = [
       [studentIds[0], 'Certificate of Enrollment', 2, 'Scholarship application', dates[1], '', 'Processing'],
       [studentIds[1], 'Certified True Copy', 1, 'College admission', dates[2], 'Sealed copy please', 'Ready for Pickup'],
-      [studentIds[4], 'Diploma', 1, 'Sports tryout', dates[3], '', 'Pending'],
+      [studentIds[4], 'Certificate of Enrollment', 1, 'Sports tryout', dates[3], '', 'Pending'],
       [studentIds[5], 'Certificate of Enrollment', 1, 'Transfer to another school', dates[4], '', 'Completed'],
       [studentIds[2], 'Certified True Copy', 3, 'Scholarship', dates[5], '', 'Pending']
     ];

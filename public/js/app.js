@@ -785,7 +785,7 @@ let _reqDraft = null;
 function openRequestForm() {
   const types = state.docTypes && state.docTypes.length
     ? state.docTypes
-    : [{ name: 'Certificate of Enrollment' }, { name: 'Diploma' },
+    : [{ name: 'Certificate of Enrollment' },
        { name: 'SF9' }, { name: 'SF10' },
        { name: 'Certified True Copy' }, { name: 'Other Registrar Documents' }];
   const p = _reqDraft || {};
@@ -829,7 +829,6 @@ function showReqInfo() {
       <div class="ri-list">${esc(t.requirements)}</div></div>`);
   }
   bits.push(`<div class="ri-meta">
-    <span>Fee: <b>${t.fee ? esc(t.fee) : '—'}</b></span>
     <span>Processing: <b>${Number(t.processing_days) || 1} working day(s)</b></span>
   </div>`);
   el.innerHTML = `<div class="req-info">${bits.join('')}</div>`;

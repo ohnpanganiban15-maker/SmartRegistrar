@@ -439,14 +439,13 @@ function viewAdminDocTypes() {
   </div>
   ${types.length === 0 ? '<div class="card empty"><div class="big">📋</div>No document types yet.</div>' : `
   <div class="table-wrap"><table class="rtable">
-    <thead><tr><th>Document</th><th>Description</th><th>Requirements</th><th>Fee</th>
+    <thead><tr><th>Document</th><th>Description</th><th>Requirements</th>
       <th>Processing</th><th>Status</th><th></th></tr></thead>
     <tbody>${types.map(t => `
       <tr${t.is_active ? '' : ' class="row-off"'}>
         <td data-label="Document"><b>${esc(t.name)}</b></td>
         <td data-label="Description" class="small">${esc(t.description || '—')}</td>
         <td data-label="Requirements" class="small">${esc((t.requirements || '').split('\n')[0] || '—')}${(t.requirements || '').indexOf('\n') !== -1 ? ' …' : ''}</td>
-        <td data-label="Fee">${t.fee ? esc(t.fee) : '<span class="muted">—</span>'}</td>
         <td data-label="Processing">${Number(t.processing_days) || 1} day(s)</td>
         <td data-label="Status">${t.is_active
           ? '<span class="stamp st-approved">Active</span>'
@@ -478,13 +477,9 @@ function openTypeForm(id) {
       <div class="field"><label for="dt-req">Requirements (one per line)</label>
         <textarea class="input" id="dt-req" rows="4"
           placeholder="&#8226; Purpose of request&#10;&#8226; Valid school ID">${esc(t ? t.requirements : '')}</textarea></div>
-      <div class="form-row">
-        <div class="field"><label for="dt-fee">Fee</label>
-          <input class="input" id="dt-fee" value="${esc(t ? t.fee : '')}" placeholder="Free / ₱50"></div>
-        <div class="field"><label for="dt-days">Processing days</label>
-          <input class="input" id="dt-days" type="number" min="0" max="60"
-            value="${t ? (Number(t.processing_days) || 0) : 1}"></div>
-      </div>
+      <div class="field"><label for="dt-days">Processing days</label>
+        <input class="input" id="dt-days" type="number" min="0" max="60"
+          value="${t ? (Number(t.processing_days) || 0) : 1}"></div>
       ${t ? `<label class="check"><input type="checkbox" id="dt-active" ${t.is_active ? 'checked' : ''}>
         Active — visible to students</label>` : ''}
     </div>
@@ -497,7 +492,7 @@ async function saveType(id) {
   const g = x => ((document.getElementById(x) || {}).value || '').trim();
   const body = {
     name: g('dt-name'), description: g('dt-desc'),
-    requirements: g('dt-req'), fee: g('dt-fee')
+    requirements: g('dt-req')
   };
   const activeEl = document.getElementById('dt-active');
   if (activeEl) body.is_active = activeEl.checked;

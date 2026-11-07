@@ -357,16 +357,16 @@ const evalA = expr => w.eval(expr);
   await sleep(80);
   {
     const info = w.document.getElementById('rf-info');
-    assert(!!info && info.textContent.includes('Fee:'), 'request form renders the requirements panel');
-    assert(info.textContent.includes('Processing:'), 'requirements panel shows the processing time');
+    assert(!!info && info.textContent.includes('Processing:'), 'request form renders the requirements panel');
+    assert(/What you need|Purpose|ID/i.test(info.textContent), 'requirements panel lists what the student needs');
     const sel = w.document.getElementById('rf-type');
-    assert(sel.options.length >= 6, 'document type dropdown lists every type (' + sel.options.length + ')');
+    assert(sel.options.length >= 5, 'document type dropdown lists every offered type (' + sel.options.length + ')');
     /* switching the type refreshes the panel with that type's content */
-    sel.value = 'Diploma';
+    sel.value = 'Certified True Copy';
     evalA(`showReqInfo()`);
     await sleep(50);
-    assert(/Diploma|certifying/i.test(w.document.getElementById('rf-info').textContent) &&
-      w.document.getElementById('rf-info').textContent.includes('Fee:'),
+    assert(/Certified True Copy|certified/i.test(w.document.getElementById('rf-info').textContent) &&
+      w.document.getElementById('rf-info').textContent.includes('Processing:'),
       'changing the document type updates the requirements panel');
   }
   evalA(`closeModal()`);
@@ -491,27 +491,28 @@ const evalA = expr => w.eval(expr);
   evalA(`openTypeForm()`);
   await sleep(60);
   assert(w.document.getElementById('dt-name') !== null, 'add-type modal opens');
+  assert(w.document.getElementById('dt-fee') === null, 'add-type modal no longer asks for a fee');
   w.document.getElementById('dt-name').value = 'FE Fixture Type';
   w.document.getElementById('dt-desc').value = 'Frontend fixture document';
   w.document.getElementById('dt-req').value = '• Purpose of request\n• Valid school ID';
-  w.document.getElementById('dt-fee').value = '₱40';
   w.document.getElementById('dt-days').value = '3';
   evalA(`saveType(null)`);
   await sleep(450);
   assert($app().includes('FE Fixture Type'), 'new document type appears in the table');
+  assert(!$app().includes('<th>Fee</th>'), 'requirements table has no Fee column');
   {
     const list = await w.eval(`Api.get('/api/requests/types')`);
     const t = list.find(x => x.name === 'FE Fixture Type');
-    assert(!!t && t.fee === '₱40' && Number(t.processing_days) === 3 && t.is_active === 1,
-      'created type persisted with fee + processing days');
+    assert(!!t && Number(t.processing_days) === 3 && t.is_active === 1,
+      'created type persisted with processing days');
     /* edit it */
     evalA(`openTypeForm(${t.id})`);
     await sleep(60);
-    w.document.getElementById('dt-fee').value = '₱55';
+    w.document.getElementById('dt-days').value = '5';
     evalA(`saveType(${t.id})`);
     await sleep(450);
     const after = (await w.eval(`Api.get('/api/requests/types')`)).find(x => x.id === t.id);
-    assert(!!after && after.fee === '₱55', 'edited fee saved');
+    assert(!!after && Number(after.processing_days) === 5, 'edited processing days saved');
     /* disable (never delete) */
     evalA(`toggleType(${t.id})`);
     await sleep(450);

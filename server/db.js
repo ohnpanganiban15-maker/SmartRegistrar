@@ -214,7 +214,7 @@ for (const t of ['SF9', 'SF10']) insertDocType.run(t);
    still carry the retired types). Idempotent. */
 function migrateDocTypes() {
   const drop = db.prepare('DELETE FROM document_types WHERE name=?');
-  for (const t of ['Form 137', 'Form 138', 'Good Moral Certificate', 'Transcript of Records']) drop.run(t);
+  for (const t of ['Form 137', 'Form 138', 'Good Moral Certificate', 'Transcript of Records', 'Diploma']) drop.run(t);
   db.prepare("INSERT OR IGNORE INTO document_types (name) VALUES ('Certified True Copy')").run();
   db.prepare("DELETE FROM document_types WHERE name='Certification'").run();
   db.prepare("UPDATE document_requests SET doc_type='Certified True Copy' WHERE doc_type='Certification'").run();
@@ -245,11 +245,6 @@ const DOC_CONTENT = {
     description: 'Official proof that a student is currently enrolled at CDLSHS.',
     requirements: '• Submit the request through this app\n• State the purpose of the certificate\n• Claim at the counter with your QR code or school ID',
     processing_days: 1
-  },
-  'Diploma': {
-    description: 'Document certifying that a student has completed the senior high school program.',
-    requirements: '• Written request with the purpose\n• Valid school ID\n• Claim only during the posted pickup hours',
-    processing_days: 3
   },
   'SF9': {
     description: "Form 9 — the learner's progress report card copy.",

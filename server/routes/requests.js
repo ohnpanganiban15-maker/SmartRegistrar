@@ -59,10 +59,10 @@ router.post('/types', requireAuth, (req, res) => {
     return res.status(409).json({ error: 'That document type already exists' });
   }
   const r = q.run(
-    `INSERT INTO document_types (name, description, requirements, fee, processing_days, is_active)
-     VALUES (?,?,?,?,?,1)`,
+    `INSERT INTO document_types (name, description, requirements, processing_days, is_active)
+     VALUES (?,?,?,?,1)`,
     name, String(b.description || '').trim(), String(b.requirements || '').trim(),
-    String(b.fee || '').trim(), clampDays(b.processing_days, 1)
+    clampDays(b.processing_days, 1)
   );
   logActivity(req.user.id, req.user.name, 'CREATE_DOC_TYPE', name);
   res.status(201).json(q.get('SELECT * FROM document_types WHERE id=?', Number(r.lastInsertRowid)));
@@ -82,12 +82,11 @@ router.put('/types/:id', requireAuth, (req, res) => {
   }
   const active = b.is_active !== undefined ? (b.is_active ? 1 : 0) : t.is_active;
   q.run(
-    `UPDATE document_types SET name=?, description=?, requirements=?, fee=?,
+    `UPDATE document_types SET name=?, description=?, requirements=?,
      processing_days=?, is_active=? WHERE id=?`,
     name,
     b.description !== undefined ? String(b.description).trim() : t.description,
     b.requirements !== undefined ? String(b.requirements).trim() : t.requirements,
-    b.fee !== undefined ? String(b.fee).trim() : t.fee,
     b.processing_days !== undefined ? clampDays(b.processing_days, t.processing_days) : t.processing_days,
     active, t.id
   );

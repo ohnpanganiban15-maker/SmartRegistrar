@@ -125,7 +125,7 @@ async function call(method, path, token, body) {
 
   /* --- document requests --- */
   r = await call('GET', '/api/requests/types', student);
-  assert(r.status === 200 && r.data.length >= 6, 'document types list (' + r.data.length + ')');
+  assert(r.status === 200 && r.data.length >= 5, 'document types list (' + r.data.length + ')');
   r = await call('POST', '/api/requests', student, { docType: 'Form 138', quantity: 2, purpose: 'Enrollment', pickupDate: '2026-10-20' });
   assert(r.status === 201 && /^REQ-\d{4}$/.test(r.data.ref), 'submit request → ' + (r.data && r.data.ref));
   assert(r.data.pickup_date === '', 'student cannot set pickup date (left empty for admin)');
@@ -478,23 +478,23 @@ async function call(method, path, token, body) {
 
   /* --- P2: document requirements management --- */
   r = await call('GET', '/api/requests/types', admin);
-  assert(r.status === 200 && r.data.length >= 6, 'admin sees every document type (' + r.data.length + ')');
+  assert(r.status === 200 && r.data.length >= 5, 'admin sees every document type (' + r.data.length + ')');
+  assert(!r.data.some(t => t.name === 'Diploma'), 'Diploma is retired from the document types');
   {
     const eo = r.data.find(t => t.name === 'Certificate of Enrollment');
     assert(!!eo && (eo.description || '').length > 10,
       'starter description pre-filled: ' + (eo ? String(eo.description).slice(0, 38) : '?'));
     assert(!!eo && /•/.test(eo.requirements || ''), 'starter requirements pre-filled');
     assert(!!eo && Number(eo.processing_days) >= 1, 'processing_days pre-filled');
-    assert(!!eo && eo.fee === '', 'fee left blank for the registrar to set');
   }
   r = await call('GET', '/api/requests/types', student);
-  assert(r.status === 200 && r.data.length >= 6 && r.data.every(t => t.is_active === 1),
+  assert(r.status === 200 && r.data.length >= 5 && r.data.every(t => t.is_active === 1),
     'students only receive active types (' + r.data.length + ')');
 
   /* create (idempotent: a previous run may already own the row) */
   r = await call('POST', '/api/requests/types', admin, {
     name: 'P2 Test Type', description: 'Fixture requirements', requirements: '• Purpose\n• Valid ID',
-    fee: '₱25', processing_days: 2
+    processing_days: 2
   });
   assert(r.status === 201 || r.status === 409, 'admin can create a document type (HTTP ' + r.status + ')');
   let p2Type = r.status === 201 ? r.data : null;
@@ -508,13 +508,13 @@ async function call(method, path, token, body) {
   r = await call('POST', '/api/requests/types', student, { name: 'Student-made type' });
   assert(r.status === 403, 'student cannot create document types');
 
-  /* edit: fee + same-day processing (0 must survive the clamp) */
+  /* edit: same-day processing (0 must survive the clamp) */
   r = await call('PUT', `/api/requests/types/${p2Type.id}`, admin,
-    { fee: '₱50', processing_days: 0, description: 'Updated P2 description' });
-  assert(r.status === 200 && r.data.fee === '₱50' && r.data.processing_days === 0 &&
+    { processing_days: 0, description: 'Updated P2 description' });
+  assert(r.status === 200 && r.data.processing_days === 0 &&
     r.data.description === 'Updated P2 description',
-    'admin edits fee, same-day processing (0 kept) and description');
-  r = await call('PUT', `/api/requests/types/${p2Type.id}`, student, { fee: 'Free' });
+    'admin edits same-day processing (0 kept) and description');
+  r = await call('PUT', `/api/requests/types/${p2Type.id}`, student, { description: 'Hacked' });
   assert(r.status === 403, 'student cannot edit a document type');
 
   /* disable (never delete) */
