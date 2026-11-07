@@ -595,16 +595,36 @@ async function call(method, path, token, body) {
   assert(r.status === 200 && r.data.feedback && r.data.feedback.total >= 1 && r.data.feedback.avg >= 1,
     'analytics carries the feedback KPI (' + r.data.feedback.total + ' @ ' + r.data.feedback.avg + ')');
 
-  /* --- progress emails (dev mode: resolves without SMTP, never blocks the API) --- */
+  /* --- progress emails (dev mode: resolves without a provider, never blocks the API) --- */
   {
     const mailer = require('./server/mailer');
     assert(typeof mailer.sendStatusMail === 'function', 'mailer exposes sendStatusMail');
+    assert(mailer.provider() === 'dev', 'mailer reports dev mode without credentials');
+    assert(mailer.settings().provider === 'dev', 'mailer settings expose the active provider');
     const sent = await mailer.sendStatusMail('student@example.com',
       'Smart Registrar — test', ['hello']);
     assert(!!sent && (sent.dev === true || sent.sent === true),
-      'sendStatusMail resolves in dev mode (no SMTP configured)');
+      'sendStatusMail resolves in dev mode (no provider configured)');
     const skipped = await mailer.sendStatusMail('', 'no recipient', ['x']);
     assert(skipped && skipped.skipped === true, 'sendStatusMail skips an empty recipient');
+
+    /* provider selection runs in a child process so the tests never touch the network */
+    const { execFileSync } = require('child_process');
+    const pick = extra => execFileSync(process.execPath, [
+      '-e', "process.stdout.write(require('./server/mailer').provider())"
+    ], { cwd: process.cwd(), env: Object.assign({}, process.env, extra), encoding: 'utf8' }).trim();
+
+    assert(pick({ BREVO_API_KEY: 'test-key', MAIL_FROM: 'sender@example.com' }) === 'brevo',
+      'Brevo is chosen when the API key + sender are present');
+    const smtpEnv = { GMAIL_USER: 'sender@gmail.com', GMAIL_APP_PASSWORD: 'x'.repeat(16) };
+    const smtpPick = execFileSync(process.execPath, [
+      '-e', "process.stdout.write(require('./server/mailer').provider())"
+    ], {
+      cwd: process.cwd(),
+      env: Object.assign({}, process.env, smtpEnv, { BREVO_API_KEY: '', MAIL_FROM: '' }),
+      encoding: 'utf8'
+    }).trim();
+    assert(smtpPick === 'smtp', 'Gmail SMTP is used when Brevo is not configured');
   }
 
   /* --- status change still succeeds with the email hook (fire-and-forget) --- */
@@ -772,26 +792,33 @@ async function call(method, path, token, body) {
   r = await call('GET', '/api/app/version');
   assert(r.status === 200 && typeof r.data.version === 'string' && r.data.version.length > 0 &&
     r.data.updated_at, 'app version endpoint (public)');
-  /* `mail` is a plain boolean — proves whether Gmail SMTP is configured
+  /* `mail` is a plain boolean — proves whether an email provider is configured
      without ever exposing a credential. Local runs are DEV mode. */
   assert(typeof r.data.mail === 'boolean',
-    'app version reports Gmail mail status as a boolean');
+    'app version reports email status as a boolean');
   assert(r.data.mail === false,
-    'local test run has no Gmail configured (OTP stays in DEV mode)');
+    'local test run has no email provider configured (OTP stays in DEV mode)');
+  assert(r.data.provider === 'dev',
+    'app version reports the active mail provider (dev)');
   /* per-variable presence, never the values themselves */
   assert(r.data.gmail && typeof r.data.gmail.user === 'boolean' &&
     typeof r.data.gmail.appPassword === 'boolean',
     'version reports Gmail variable presence as booleans');
   assert(r.data.gmail.user === false && r.data.gmail.appPassword === false,
     'local .env leaves both Gmail variables empty');
+  assert(r.data.brevo && typeof r.data.brevo.apiKey === 'boolean' &&
+    typeof r.data.brevo.from === 'boolean',
+    'version reports Brevo variable presence as booleans');
+  assert(r.data.brevo.apiKey === false && r.data.brevo.from === false,
+    'local .env leaves both Brevo variables empty');
   assert(!('gmail_keys' in r.data),
     'no environment enumeration field on the public endpoint');
-  /* only GMAIL-ish names may appear, and only as identifier-like strings */
+  /* only mail-ish names may appear, and only as identifier-like strings */
   assert(Array.isArray(r.data.gmail.matched) &&
     r.data.gmail.matched.every(n => /^[A-Za-z0-9_]+( <trailing-space>)?$/.test(n)),
-    'gmail matched entries are bare names, never values');
+    'mail matched entries are bare names, never values');
   assert(r.data.gmail.matched.length > 0,
-    'local .env defines the Gmail names (empty values still register as names)');
+    'local .env defines the email variable names (empty values still register as names)');
 
   /* --- Google sign-in fully removed: no config leak, no auth endpoints --- */
   r = await call('GET', '/api/app/config');

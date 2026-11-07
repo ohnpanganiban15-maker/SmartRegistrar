@@ -8,7 +8,7 @@ const path = require('path');
 const { q, db, logActivity } = require('../db');
 const { requireAuth, requireAdmin } = require('../auth');
 const { version, bootedAt } = require('../version');
-const { isConfigured } = require('../mailer');
+const { isConfigured, provider } = require('../mailer');
 
 const router = express.Router();
 
@@ -16,26 +16,33 @@ const router = express.Router();
    Clients compare this against the build they loaded; a mismatch means
    a new deploy happened and the "update available" banner is shown.
 
-   `mail` reports whether Gmail SMTP is configured — a boolean only, so no
-   secret ever leaves the server. mail:false means OTP runs in DEV MODE.
+   `mail` reports whether an email provider is configured — a boolean only,
+   so no secret ever leaves the server. mail:false means OTP runs in DEV MODE.
+   `provider` is "brevo" (HTTPS, works on Render Free), "smtp" (Gmail) or "dev".
 
-   `gmail` reports, per expected variable, whether a NON-EMPTY value is
-   present — enough to pinpoint a missing entry. `matched` lists the *names*
-   (never values) of every environment variable containing "gmail" in any
-   case, so a mistyped key such as "GMAIL_USER " or "gmailUser" is visible
+   `gmail` / `brevo` report, per expected variable, whether a NON-EMPTY value
+   is present — enough to pinpoint a missing entry. `matched` lists the *names*
+   (never values) of every environment variable containing "gmail", "brevo" or
+   "mail_from" in any case, so a mistyped key such as "GMAIL_USER " is visible
    instead of silently ignored. Names are not credentials. */
 router.get('/app/version', (req, res) => {
   const matched = Object.keys(process.env)
-    .filter(k => /gmail/i.test(k))
+    .filter(k => /gmail|brevo|mail_from/i.test(k))
     .map(k => k.replace(/\s+$/, '') + (k !== k.replace(/\s+$/, '') ? ' <trailing-space>' : ''))
     .sort();
   res.json({
     version, updated_at: bootedAt, name: 'CDLSHS Smart Registrar',
     mail: isConfigured(),
+    provider: provider(),
     gmail: {
       user: !!process.env.GMAIL_USER,
       appPassword: !!process.env.GMAIL_APP_PASSWORD,
       matched
+    },
+    brevo: {
+      apiKey: !!process.env.BREVO_API_KEY,
+      from: !!process.env.MAIL_FROM,
+      senderName: !!process.env.MAIL_FROM_NAME
     }
   });
 });

@@ -70,7 +70,7 @@ same Wi-Fi network.
 4. Every following request carries `Authorization: Bearer <token>` — the backend checks the token and the user's **role** (admin/student) before allowing access.
 5. The booking is validated **inside a database transaction**: the slot must be open and free of other active appointments → **double booking is impossible**.
 6. Data is stored in the **SQLite file** (`database/smart-registrar.db`), and a **notification** is written for the student.
-7. When the registrar changes a request/appointment status (Processing, Ready for Pickup, Completed, Rejected, Cancelled), the student also gets an **email via Gmail SMTP** — if `GMAIL_USER` + `GMAIL_APP_PASSWORD` are set (otherwise the email is only logged in dev mode).
+7. When the registrar changes a request/appointment status (Processing, Ready for Pickup, Completed, Rejected, Cancelled), the student also gets an **email** — via **Brevo HTTP API** when `BREVO_API_KEY` + `MAIL_FROM` are set (works on Render Free), or **Gmail SMTP** when `GMAIL_USER` + `GMAIL_APP_PASSWORD` are set (localhost/paid hosts). With neither, the email is only logged in dev mode.
 8. The registrar's dashboard reads the same database → sees the booking instantly.
 
 **Security practices implemented:**
@@ -172,6 +172,15 @@ HOST=0.0.0.0             # reachable from other devices
 JWT_SECRET=change-me...  # change this to random text
 DB_PATH=./database/smart-registrar.db
 ```
+
+**Email (OTP + status notifications).** Two options, picked automatically:
+
+- **Brevo HTTP API** — `BREVO_API_KEY` + `MAIL_FROM` (a verified sender in Brevo).
+  Recommended for Render Free because it uses HTTPS; Render Free blocks SMTP ports.
+- **Gmail SMTP** — `GMAIL_USER` + `GMAIL_APP_PASSWORD` (App Password, 2FA required).
+  Works on localhost and paid hosts. If both are set, Brevo wins.
+
+Without either, emails are only printed to the server console (dev mode).
 
 ### Step 4 — Start the server
 
@@ -399,6 +408,10 @@ node test-frontend.js    ← 229 UI checks (every screen, booking flow, dark mod
 
 Expected: `Results: 20 passed, 0 failed`, `Results: 250 passed, 0 failed` and
 `Results: 229 passed, 0 failed`.
+
+> The automated tests expect **dev mode** (no email provider configured) because
+> they read the OTP from the API response. Leave `BREVO_API_KEY`, `MAIL_FROM`,
+> `GMAIL_USER` and `GMAIL_APP_PASSWORD` empty when running the suite.
 
 ### Manual test script (for demonstrations / defense)
 
