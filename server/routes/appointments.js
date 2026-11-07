@@ -6,6 +6,7 @@
 const express = require('express');
 const { db, q, logActivity } = require('../db');
 const { requireAuth, validateBody } = require('../auth');
+const { sendStatusMail } = require('../mailer');
 
 const router = express.Router();
 
@@ -141,7 +142,7 @@ router.put('/:id/status', requireAuth, (req, res) => {
 
   q.run('UPDATE appointments SET status=?, updated_at=datetime(\'now\') WHERE id=?', status, appt.id);
 
-  const studentUser = q.get('SELECT id FROM users WHERE student_id=?', appt.student_id);
+  const studentUser = q.get('SELECT id, name, email FROM users WHERE student_id=?', appt.student_id);
   const titles = {
     Approved: 'Appointment Approved', Rejected: 'Appointment Rejected', Completed: 'Appointment Completed',
     Cancelled: 'Appointment Cancelled', Confirmed: 'Appointment Confirmed', Pending: 'Appointment Reopened'
@@ -149,6 +150,30 @@ router.put('/:id/status', requireAuth, (req, res) => {
   if (studentUser) {
     notify(studentUser.id, titles[status] || 'Appointment Updated',
       appt.ref + ' for ' + appt.date + ' ' + appt.start_time + ' → ' + status + (reason ? '. Reason: ' + reason : '.'));
+
+    const subjects = {
+      Approved: 'Your appointment is approved',
+      Confirmed: 'Your appointment is confirmed',
+      Completed: 'Your appointment is completed',
+      Cancelled: 'Your appointment was cancelled',
+      Rejected: 'Your appointment was rejected',
+      Pending: 'Your appointment was reopened'
+    };
+    if (subjects[status]) {
+      const lines = [
+        'Hi ' + (studentUser.name || 'student') + ',',
+        '',
+        'Your appointment ' + appt.ref + ' (' + appt.service + ') on ' +
+          appt.date + ' at ' + appt.start_time + ' is now: ' + status + '.'
+      ];
+      if (reason) lines.push('Reason: ' + reason);
+      if (status === 'Approved' || status === 'Confirmed') {
+        lines.push('Please arrive a few minutes early and bring a valid ID.');
+      }
+      lines.push('', 'You can also view this appointment inside the Smart Registrar app.');
+      sendStatusMail(studentUser.email,
+        'Smart Registrar — ' + subjects[status], lines).catch(() => {});
+    }
   }
   logActivity(req.user.id, req.user.name, 'APPOINTMENT_' + status.toUpperCase(), appt.ref);
   res.json({ message: 'Appointment marked as ' + status });

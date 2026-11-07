@@ -70,7 +70,8 @@ same Wi-Fi network.
 4. Every following request carries `Authorization: Bearer <token>` — the backend checks the token and the user's **role** (admin/student) before allowing access.
 5. The booking is validated **inside a database transaction**: the slot must be open and free of other active appointments → **double booking is impossible**.
 6. Data is stored in the **SQLite file** (`database/smart-registrar.db`), and a **notification** is written for the student.
-7. The registrar's dashboard reads the same database → sees the booking instantly.
+7. When the registrar changes a request/appointment status (Processing, Ready for Pickup, Completed, Rejected, Cancelled), the student also gets an **email via Gmail SMTP** — if `GMAIL_USER` + `GMAIL_APP_PASSWORD` are set (otherwise the email is only logged in dev mode).
+8. The registrar's dashboard reads the same database → sees the booking instantly.
 
 **Security practices implemented:**
 
@@ -391,11 +392,13 @@ npx cap run android
 With the server running (`npm start`), open a **second** terminal in the project folder:
 
 ```text
-node test-api.js        ← 52 API checks (auth, booking, double-booking, QR, security…)
-node test-frontend.js   ← 39 UI checks (every screen, booking flow, dark mode…) 
+node test-persistence.js ← 20 persistence checks (snapshot/restore)
+node test-api.js         ← 250 API checks (auth, booking, documents, queue, security…)
+node test-frontend.js    ← 229 UI checks (every screen, booking flow, dark mode…)
 ```
 
-Expected: `Results: 52 passed, 0 failed` and `Results: 39 passed, 0 failed`.
+Expected: `Results: 20 passed, 0 failed`, `Results: 250 passed, 0 failed` and
+`Results: 229 passed, 0 failed`.
 
 ### Manual test script (for demonstrations / defense)
 

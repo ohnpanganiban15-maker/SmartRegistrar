@@ -55,4 +55,35 @@ function sendOtpMail(to, code, purpose) {
     });
 }
 
-module.exports = { sendOtpMail, isConfigured: () => configured };
+/* ---------------------------------------------------------------
+   Status / progress emails (request updates, pickup schedules).
+   Fire-and-forget: a mail failure must never break the API call,
+   so every send resolves instead of throwing.
+   --------------------------------------------------------------- */
+function sendStatusMail(to, subject, bodyLines) {
+  if (!to) return Promise.resolve({ skipped: true });
+  const text = []
+    .concat(bodyLines || [])
+    .concat(['', '— Smart Registrar (CDLSHS)'])
+    .join('\n');
+
+  if (!transporter) {
+    console.log('[mailer:dev] status email para sa ' + to + ' :: ' + subject);
+    return Promise.resolve({ dev: true });
+  }
+
+  return transporter.sendMail({
+    from: '"Smart Registrar" <' + user + '>',
+    to, subject, text
+  }).then(info => ({ sent: true, messageId: info.messageId }))
+    .catch(err => {
+      console.error('[mailer] status send failed:', err.message);
+      return { sent: false, error: err.message };
+    });
+}
+
+module.exports = {
+  sendOtpMail,
+  sendStatusMail,
+  isConfigured: () => configured
+};

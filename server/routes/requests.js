@@ -4,6 +4,7 @@
 const express = require('express');
 const { q, logActivity } = require('../db');
 const { requireAuth, validateBody } = require('../auth');
+const { sendStatusMail } = require('../mailer');
 
 const router = express.Router();
 
@@ -247,7 +248,7 @@ router.put('/:id/status', requireAuth, (req, res) => {
   q.run(`UPDATE document_requests SET status=?, pickup_date=?, pickup_time=?,
          updated_at=datetime('now') WHERE id=?`, status, date, time, reqRow.id);
 
-  const studentUser = q.get('SELECT id FROM users WHERE student_id=?', reqRow.student_id);
+  const studentUser = q.get('SELECT id, name, email FROM users WHERE student_id=?', reqRow.student_id);
   const titles = {
     Processing: 'Request Now Processing', 'Ready for Pickup': 'Document Ready for Pickup',
     Completed: 'Request Completed', Rejected: 'Request Rejected', Cancelled: 'Request Cancelled',
@@ -259,6 +260,33 @@ router.put('/:id/status', requireAuth, (req, res) => {
       body += ' You can claim it ' + whenText(date, time) + '.';
     }
     notify(studentUser.id, titles[status] || 'Request Updated', body);
+
+    /* the same update also lands in the student's Gmail (fire-and-forget) */
+    const subjects = {
+      Processing: 'Your document request is now processing',
+      'Ready for Pickup': 'Your document is ready for pickup',
+      Completed: 'Your document request is completed',
+      Rejected: 'Your document request was rejected',
+      Cancelled: 'Your document request was cancelled',
+      Pending: 'Your document request was reopened'
+    };
+    if (subjects[status]) {
+      const lines = [
+        'Hi ' + (studentUser.name || 'student') + ',',
+        '',
+        'Your document request ' + reqRow.ref + ' (' + reqRow.doc_type + ') is now: ' + status + '.'
+      ];
+      if (reason) lines.push('Reason: ' + reason);
+      if (status === 'Ready for Pickup') {
+        lines.push(date
+          ? 'You can claim it ' + whenText(date, time) + '.'
+          : 'Please wait for the registrar to post the pickup schedule.');
+        lines.push('Bring a valid ID or show your QR code at the registrar counter.');
+      }
+      lines.push('', 'You can also track this request inside the Smart Registrar app.');
+      sendStatusMail(studentUser.email,
+        'Smart Registrar — ' + (subjects[status]), lines).catch(() => {});
+    }
   }
   logActivity(req.user.id, req.user.name, 'REQUEST_' + status.toUpperCase().replace(/ /g, '_'), reqRow.ref);
   res.json({ message: 'Request marked as ' + status, pickup_date: date, pickup_time: time });
@@ -289,10 +317,19 @@ router.put('/:id/pickup', requireAuth, (req, res) => {
   const changed = (date && date !== (reqRow.pickup_date || '')) ||
                   (time && time !== (reqRow.pickup_time || ''));
   if (changed) {
-    const studentUser = q.get('SELECT id FROM users WHERE student_id=?', reqRow.student_id);
+    const studentUser = q.get('SELECT id, name, email FROM users WHERE student_id=?', reqRow.student_id);
     if (studentUser) {
       notify(studentUser.id, 'Pickup Schedule Set',
         reqRow.ref + ' (' + reqRow.doc_type + ') can be claimed ' + whenText(date, time) + '.', 'request');
+      sendStatusMail(studentUser.email, 'Smart Registrar — Pickup schedule set', [
+        'Hi ' + (studentUser.name || 'student') + ',',
+        '',
+        'Your document request ' + reqRow.ref + ' (' + reqRow.doc_type + ') can be claimed ' +
+          whenText(date, time) + '.',
+        'Bring a valid ID or show your QR code at the registrar counter.',
+        '',
+        'You can also view this schedule inside the Smart Registrar app.'
+      ]).catch(() => {});
     }
   }
   logActivity(req.user.id, req.user.name, 'SET_PICKUP_SCHEDULE',
@@ -321,10 +358,18 @@ function sweepAutoComplete() {
   for (const r of due) {
     q.run(`UPDATE document_requests SET status='Completed',
            updated_at=datetime('now') WHERE id=?`, r.id);
-    const studentUser = q.get('SELECT id FROM users WHERE student_id=?', r.student_id);
+    const studentUser = q.get('SELECT id, name, email FROM users WHERE student_id=?', r.student_id);
     if (studentUser) {
       notify(studentUser.id, 'Request Completed',
         r.ref + ' (' + r.doc_type + ') → Completed. The 24-hour claim window has ended.', 'request');
+      sendStatusMail(studentUser.email, 'Smart Registrar — Request auto-completed', [
+        'Hi ' + (studentUser.name || 'student') + ',',
+        '',
+        'Your document request ' + r.ref + ' (' + r.doc_type + ') has been marked Completed ' +
+          'because the 24-hour claim window has ended.',
+        '',
+        'If this is unexpected, contact the registrar through the app.'
+      ]).catch(() => {});
     }
     logActivity(null, 'system', 'REQUEST_AUTO_COMPLETED', r.ref);
   }

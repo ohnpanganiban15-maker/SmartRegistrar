@@ -595,6 +595,42 @@ async function call(method, path, token, body) {
   assert(r.status === 200 && r.data.feedback && r.data.feedback.total >= 1 && r.data.feedback.avg >= 1,
     'analytics carries the feedback KPI (' + r.data.feedback.total + ' @ ' + r.data.feedback.avg + ')');
 
+  /* --- progress emails (dev mode: resolves without SMTP, never blocks the API) --- */
+  {
+    const mailer = require('./server/mailer');
+    assert(typeof mailer.sendStatusMail === 'function', 'mailer exposes sendStatusMail');
+    const sent = await mailer.sendStatusMail('student@example.com',
+      'Smart Registrar — test', ['hello']);
+    assert(!!sent && (sent.dev === true || sent.sent === true),
+      'sendStatusMail resolves in dev mode (no SMTP configured)');
+    const skipped = await mailer.sendStatusMail('', 'no recipient', ['x']);
+    assert(skipped && skipped.skipped === true, 'sendStatusMail skips an empty recipient');
+  }
+
+  /* --- status change still succeeds with the email hook (fire-and-forget) --- */
+  r = await call('POST', '/api/requests', student,
+    { docType: 'SF9', quantity: 1, purpose: 'Email hook test' });
+  assert(r.status === 201, 'email-hook fixture request created');
+  const mailReqId = r.data.id;
+  r = await call('PUT', `/api/requests/${mailReqId}/status`, admin, { status: 'Processing' });
+  assert(r.status === 200, 'Processing status change succeeds with the email hook');
+  r = await call('PUT', `/api/requests/${mailReqId}/status`, admin,
+    { status: 'Ready for Pickup', pickupDate: '2026-12-01', pickupTime: '09:00' });
+  assert(r.status === 200, 'Ready for Pickup with a schedule succeeds with the email hook');
+  r = await call('PUT', `/api/requests/${mailReqId}/pickup`, admin,
+    { date: '2026-12-02', time: '10:30' });
+  assert(r.status === 200, 'pickup schedule edit succeeds with the email hook');
+  r = await call('POST', '/api/requests', student,
+    { docType: 'SF10', quantity: 1, purpose: 'Appointment mail hook' });
+  r = await call('GET', '/api/slots', student);
+  const mailSlot = (r.data || []).find(s => !s.is_booked);
+  r = await call('POST', '/api/appointments', student,
+    { slotId: mailSlot.id, service: 'Other', purpose: 'Email hook test' });
+  assert(r.status === 201, 'email-hook appointment created');
+  const mailApptId = r.data.id;
+  r = await call('PUT', `/api/appointments/${mailApptId}/status`, admin, { status: 'Approved' });
+  assert(r.status === 200, 'appointment Approved succeeds with the email hook');
+
   /* --- notifications read --- */
   r = await call('PUT', '/api/notifications/read-all', student);
   assert(r.status === 200, 'mark all notifications read');
