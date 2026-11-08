@@ -31,7 +31,18 @@ const assert = (c, msg) => { if (c) { pass++; console.log('PASS:', msg); } else 
   const u1 = Number(q.run("SELECT id FROM users WHERE email='persist.one@cdlshs.edu.ph'").lastInsertRowid);
   q.run("INSERT INTO students (user_id,first_name,last_name,student_number) VALUES (?,?,?,?)",
     u1, 'Persist', 'One', 'P-0001');
+  const s1 = Number(q.get("SELECT id FROM students WHERE student_number='P-0001'").id);
   q.run("INSERT OR IGNORE INTO document_types (name) VALUES ('COG')");
+  /* a Completed request whose completed_at is still empty — this is what an
+     older cloud snapshot looks like after the field was introduced. */
+  q.run(`INSERT INTO document_requests
+           (ref, student_id, student_name, doc_type, quantity, purpose,
+            claimed_at, completed_at, status)
+         VALUES (?,?,?,?,?,?,?,?,?)`,
+    'PERSIST-REQ-1', s1, 'Persist One', 'COG', 1, 'test',
+    '2026-11-06 05:39:13', '', 'Completed');
+  assert(q.get("SELECT completed_at FROM document_requests WHERE ref='PERSIST-REQ-1'").completed_at === '',
+    'fixture request starts without a completed_at (legacy snapshot shape)');
 
   /* --- build a snapshot --- */
   const snap = persistence.snapshotJSON();
@@ -67,6 +78,11 @@ const assert = (c, msg) => { if (c) { pass++; console.log('PASS:', msg); } else 
     'student restored (FK-safe circular insert)');
   assert(!!q.get("SELECT id FROM document_types WHERE name='COG'"),
     'custom doc type restored');
+  {
+    const backfilled = q.get("SELECT completed_at FROM document_requests WHERE ref='PERSIST-REQ-1'");
+    assert(!!backfilled && backfilled.completed_at === '2026-11-06 05:39:13',
+      'restore backfills completed_at from the QR scan time');
+  }
 
   /* --- AUTOINCREMENT sequence reset: new inserts must not collide --- */
   let seqOk = true, newId = null;

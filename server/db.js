@@ -272,16 +272,22 @@ migrateRequestStatuses();
 
 /* ---- backfill completed_at for requests finished before the field existed.
    Manual completions use the exact REQUEST_COMPLETED log time; scanned ones
-   use the QR scan time; anything else falls back to the last update. ---- */
-db.exec(`
-  UPDATE document_requests
-  SET completed_at = COALESCE(
-    (SELECT MAX(created_at) FROM activity_logs
-      WHERE action='REQUEST_COMPLETED' AND details=document_requests.ref),
-    CASE WHEN claimed_at != '' THEN claimed_at ELSE updated_at END
-  )
-  WHERE status='Completed' AND completed_at=''
-`);
+   use the QR scan time; anything else falls back to the last update.
+   Runs at boot AND again after a persistence restore, because an older cloud
+   snapshot carries no completed_at values. Idempotent. ---- */
+function backfillCompletedAt() {
+  const r = db.prepare(`
+    UPDATE document_requests
+    SET completed_at = COALESCE(
+      (SELECT MAX(created_at) FROM activity_logs
+        WHERE action='REQUEST_COMPLETED' AND details=document_requests.ref),
+      CASE WHEN claimed_at != '' THEN claimed_at ELSE updated_at END
+    )
+    WHERE status='Completed' AND completed_at=''
+  `).run();
+  return r.changes || 0;
+}
+backfillCompletedAt();
 
 /* ---- ensure required document types exist (safe on old + fresh DBs) ---- */
 const insertDocType = db.prepare('INSERT OR IGNORE INTO document_types (name) VALUES (?)');
@@ -367,4 +373,4 @@ function logActivity(userId, userName, action, details) {
   );
 }
 
-module.exports = { db, q, logActivity, migrateDocTypes };
+module.exports = { db, q, logActivity, migrateDocTypes, backfillCompletedAt };
