@@ -58,6 +58,7 @@ router.get('/dashboard/stats', requireAuth, (req, res) => {
       approvedAppointments: c("SELECT COUNT(*) c FROM appointments WHERE status IN ('Approved','Confirmed')"),
       completedAppointments: c("SELECT COUNT(*) c FROM appointments WHERE status='Completed'"),
       pendingRequests: c("SELECT COUNT(*) c FROM document_requests WHERE status='Pending'"),
+      underReviewRequests: c("SELECT COUNT(*) c FROM document_requests WHERE status='Under Review'"),
       processingRequests: c("SELECT COUNT(*) c FROM document_requests WHERE status='Processing'"),
       readyRequests: c("SELECT COUNT(*) c FROM document_requests WHERE status='Ready for Pickup'"),
       completedRequests: c("SELECT COUNT(*) c FROM document_requests WHERE status='Completed'"),
@@ -71,6 +72,7 @@ router.get('/dashboard/stats', requireAuth, (req, res) => {
     pendingAppointments: c("SELECT COUNT(*) c FROM appointments WHERE status='Pending' AND student_id=" + (sid || -1)),
     approvedAppointments: c("SELECT COUNT(*) c FROM appointments WHERE status IN ('Approved','Confirmed') AND student_id=" + (sid || -1)),
     pendingRequests: c("SELECT COUNT(*) c FROM document_requests WHERE status='Pending' AND student_id=" + (sid || -1)),
+    underReviewRequests: c("SELECT COUNT(*) c FROM document_requests WHERE status='Under Review' AND student_id=" + (sid || -1)),
     processingRequests: c("SELECT COUNT(*) c FROM document_requests WHERE status='Processing' AND student_id=" + (sid || -1)),
     completedRequests: c("SELECT COUNT(*) c FROM document_requests WHERE status='Completed' AND student_id=" + (sid || -1)),
     readyRequests: c("SELECT COUNT(*) c FROM document_requests WHERE status='Ready for Pickup' AND student_id=" + (sid || -1)),
@@ -81,20 +83,27 @@ router.get('/dashboard/stats', requireAuth, (req, res) => {
 /* GET /api/reports — admin: counts per month + status breakdown */
 router.get('/reports', requireAuth, requireAdmin, (req, res) => {
   const appointmentsByStatus = q.all('SELECT status, COUNT(*) c FROM appointments GROUP BY status');
-  const requestsByStatus = q.all('SELECT status, COUNT(*) c FROM document_requests GROUP BY status');
+  /* legacy Rejected/Cancelled rows (if any) stay in the DB for history but are
+     excluded from every report so the registrar only sees the live workflow. */
+  const requestsByStatus = q.all(
+    `SELECT status, COUNT(*) c FROM document_requests
+     WHERE status NOT IN ('Rejected','Cancelled') GROUP BY status`
+  );
   const appointmentsByMonth = q.all(
     `SELECT strftime('%Y-%m', created_at) month, COUNT(*) c FROM appointments
      WHERE created_at >= date('now','-6 months') GROUP BY month ORDER BY month`
   );
   const requestsByMonth = q.all(
     `SELECT strftime('%Y-%m', created_at) month, COUNT(*) c FROM document_requests
-     WHERE created_at >= date('now','-6 months') GROUP BY month ORDER BY month`
+     WHERE created_at >= date('now','-6 months') AND status NOT IN ('Rejected','Cancelled')
+     GROUP BY month ORDER BY month`
   );
   const topServices = q.all(
     'SELECT service, COUNT(*) c FROM appointments GROUP BY service ORDER BY c DESC LIMIT 5'
   );
   const topDocuments = q.all(
-    'SELECT doc_type, COUNT(*) c FROM document_requests GROUP BY doc_type ORDER BY c DESC LIMIT 5'
+    `SELECT doc_type, COUNT(*) c FROM document_requests
+     WHERE status NOT IN ('Rejected','Cancelled') GROUP BY doc_type ORDER BY c DESC LIMIT 5`
   );
   res.json({ appointmentsByStatus, requestsByStatus, appointmentsByMonth, requestsByMonth, topServices, topDocuments });
 });
@@ -104,13 +113,16 @@ router.get('/reports', requireAuth, requireAdmin, (req, res) => {
 router.get('/analytics', requireAuth, requireAdmin, (req, res) => {
   const one = sql => q.get(sql) || {};
   const num = v => (v === null || v === undefined || isNaN(v)) ? 0 : Number(v);
-  const total = num(one('SELECT COUNT(*) c FROM document_requests').c);
+  /* analytics covers only the five live statuses — legacy Rejected/Cancelled
+     rows remain in the database for history but never affect the numbers. */
+  const LIVE = "status NOT IN ('Rejected','Cancelled')";
+  const total = num(one('SELECT COUNT(*) c FROM document_requests WHERE ' + LIVE).c);
   const completed = num(one("SELECT COUNT(*) c FROM document_requests WHERE status='Completed'").c);
-  const rejected = num(one("SELECT COUNT(*) c FROM document_requests WHERE status IN ('Rejected','Cancelled')").c);
+  const underReview = num(one("SELECT COUNT(*) c FROM document_requests WHERE status='Under Review'").c);
   const backlog = num(one(`SELECT COUNT(*) c FROM document_requests
-    WHERE status IN ('Pending','Processing') AND created_at < datetime('now','-2 days')`).c);
-  const today = num(one("SELECT COUNT(*) c FROM document_requests WHERE date(created_at)=date('now')").c);
-  const week = num(one("SELECT COUNT(*) c FROM document_requests WHERE created_at >= date('now','-7 days')").c);
+    WHERE status IN ('Pending','Under Review','Processing') AND created_at < datetime('now','-2 days')`).c);
+  const today = num(one("SELECT COUNT(*) c FROM document_requests WHERE date(created_at)=date('now') AND " + LIVE).c);
+  const week = num(one("SELECT COUNT(*) c FROM document_requests WHERE created_at >= date('now','-7 days') AND " + LIVE).c);
   const claimed = num(one("SELECT COUNT(*) c FROM document_requests WHERE claimed_at != ''").c);
   const within24 = num(one(`SELECT COUNT(*) c FROM document_requests
     WHERE claimed_at != '' AND status='Completed'
@@ -122,9 +134,9 @@ router.get('/analytics', requireAuth, requireAdmin, (req, res) => {
 
   res.json({
     requests: {
-      total, completed, rejected, backlog, today, week, claimed,
+      total, completed, underReview, backlog, today, week, claimed,
       completionRate: total ? Math.round(completed / total * 100) : 0,
-      rejectionRate: total ? Math.round(rejected / total * 100) : 0,
+      underReviewRate: total ? Math.round(underReview / total * 100) : 0,
       avgTurnaroundH: num(one(`SELECT ROUND(AVG((julianday(updated_at) - julianday(created_at)) * 24), 1) h
         FROM document_requests WHERE status='Completed'`).h),
       avgClaimWindowH: num(one(`SELECT ROUND(AVG((julianday(updated_at) - julianday(claimed_at)) * 24), 1) h
@@ -143,17 +155,18 @@ router.get('/analytics', requireAuth, requireAdmin, (req, res) => {
     },
     trends: {
       byWeekday: q.all(`SELECT CAST(strftime('%w', created_at) AS INTEGER) d, COUNT(*) c
-        FROM document_requests GROUP BY d ORDER BY d`),
+        FROM document_requests WHERE ${LIVE} GROUP BY d ORDER BY d`),
       byHour: q.all(`SELECT CAST(strftime('%H', created_at) AS INTEGER) h, COUNT(*) c
-        FROM document_requests GROUP BY h ORDER BY h`),
+        FROM document_requests WHERE ${LIVE} GROUP BY h ORDER BY h`),
       byMonth: q.all(`SELECT strftime('%Y-%m', created_at) month, COUNT(*) c
-        FROM document_requests WHERE created_at >= date('now','-6 months')
+        FROM document_requests WHERE created_at >= date('now','-6 months') AND ${LIVE}
         GROUP BY month ORDER BY month`)
     },
     top: {
-      documents: q.all('SELECT doc_type label, COUNT(*) c FROM document_requests GROUP BY doc_type ORDER BY c DESC LIMIT 6'),
+      documents: q.all(`SELECT doc_type label, COUNT(*) c FROM document_requests
+        WHERE ${LIVE} GROUP BY doc_type ORDER BY c DESC LIMIT 6`),
       students: q.all(`SELECT student_name label, COUNT(*) c FROM document_requests
-        GROUP BY student_name ORDER BY c DESC LIMIT 5`),
+        WHERE ${LIVE} GROUP BY student_name ORDER BY c DESC LIMIT 5`),
       services: q.all(`SELECT service label, COUNT(*) c FROM appointments
         GROUP BY service ORDER BY c DESC LIMIT 5`)
     },
@@ -322,8 +335,6 @@ router.get('/qr/lookup', requireAuth, (req, res) => {
     let verify;
     if (r.status === 'Completed') {
       verify = { verdict: 'COMPLETED', tone: 'muted', message: 'Already claimed — this request is completed.' };
-    } else if (['Rejected', 'Cancelled'].includes(r.status)) {
-      verify = { verdict: 'INVALID', tone: 'bad', message: 'This request was ' + r.status.toLowerCase() + '.' };
     } else if (r.claimed_at && hoursLeft(r.claimed_at) > 0) {
       verify = {
         verdict: 'IN_WINDOW', tone: 'ok',

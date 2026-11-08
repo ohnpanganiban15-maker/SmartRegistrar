@@ -91,7 +91,10 @@ CREATE TABLE IF NOT EXISTS document_requests (
   claimed_at  TEXT NOT NULL DEFAULT '',
   notes       TEXT NOT NULL DEFAULT '',
   status      TEXT NOT NULL DEFAULT 'Pending'
-              CHECK(status IN ('Pending','Processing','Ready for Pickup','Completed','Rejected','Cancelled')),
+              /* Under Review is the new registrar triage step. Rejected/Cancelled
+                 are kept ONLY so historical rows and old snapshots still restore;
+                 the API/UI never write them anymore. */
+              CHECK(status IN ('Pending','Under Review','Processing','Ready for Pickup','Completed','Rejected','Cancelled')),
   created_at  TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at  TEXT NOT NULL DEFAULT (datetime('now'))
 );
@@ -204,6 +207,65 @@ ensureColumn('document_types', 'is_active INTEGER NOT NULL DEFAULT 1');
 ensureColumn('appointments', 'queue_no INTEGER NOT NULL DEFAULT 0');
 ensureColumn('appointments', "queue_state TEXT NOT NULL DEFAULT ''");
 ensureColumn('appointments', 'no_show INTEGER NOT NULL DEFAULT 0');
+
+/* ---- document request statuses: add "Under Review" --------------------
+   SQLite cannot change a CHECK constraint in place, so rebuild the table
+   while preserving every row (ids included). Legacy Rejected/Cancelled rows
+   are copied as-is — never deleted. The API only accepts the new five. */
+function migrateRequestStatuses() {
+  const row = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='document_requests'").get();
+  if (!row || /Under Review/.test(row.sql || '')) return false;
+
+  const legacy = db.prepare(
+    "SELECT status, COUNT(*) c FROM document_requests WHERE status IN ('Rejected','Cancelled') GROUP BY status"
+  ).all();
+  if (legacy.length) {
+    console.warn('[migrate] document_requests has legacy statuses (kept as-is):', JSON.stringify(legacy));
+  }
+
+  db.exec('PRAGMA foreign_keys=OFF');
+  try {
+    db.exec('BEGIN IMMEDIATE');
+    db.exec('DROP TABLE IF EXISTS document_requests_new');
+    db.exec(`
+      CREATE TABLE document_requests_new (
+        id          INTEGER PRIMARY KEY AUTOINCREMENT,
+        ref         TEXT NOT NULL UNIQUE,
+        student_id  INTEGER NOT NULL REFERENCES students(id) ON DELETE CASCADE,
+        student_name TEXT NOT NULL,
+        doc_type    TEXT NOT NULL,
+        quantity    INTEGER NOT NULL DEFAULT 1 CHECK(quantity > 0),
+        purpose     TEXT NOT NULL DEFAULT '',
+        pickup_date TEXT NOT NULL DEFAULT '',
+        pickup_time TEXT NOT NULL DEFAULT '',
+        claimed_at  TEXT NOT NULL DEFAULT '',
+        notes       TEXT NOT NULL DEFAULT '',
+        status      TEXT NOT NULL DEFAULT 'Pending'
+                    CHECK(status IN ('Pending','Under Review','Processing','Ready for Pickup','Completed','Rejected','Cancelled')),
+        created_at  TEXT NOT NULL DEFAULT (datetime('now')),
+        updated_at  TEXT NOT NULL DEFAULT (datetime('now'))
+      )`);
+    db.exec(`
+      INSERT INTO document_requests_new
+        (id, ref, student_id, student_name, doc_type, quantity, purpose,
+         pickup_date, pickup_time, claimed_at, notes, status, created_at, updated_at)
+      SELECT id, ref, student_id, student_name, doc_type, quantity, purpose,
+             pickup_date, pickup_time, claimed_at, notes, status, created_at, updated_at
+      FROM document_requests`);
+    db.exec('DROP TABLE document_requests');
+    db.exec('ALTER TABLE document_requests_new RENAME TO document_requests');
+    db.exec('CREATE INDEX IF NOT EXISTS idx_req_student ON document_requests(student_id)');
+    db.exec('COMMIT');
+    console.log('[migrate] document_requests rebuilt: Under Review supported');
+  } catch (e) {
+    try { db.exec('ROLLBACK'); } catch (_) { /* already rolled back */ }
+    throw e;
+  } finally {
+    db.exec('PRAGMA foreign_keys=ON');
+  }
+  return true;
+}
+migrateRequestStatuses();
 
 /* ---- ensure required document types exist (safe on old + fresh DBs) ---- */
 const insertDocType = db.prepare('INSERT OR IGNORE INTO document_types (name) VALUES (?)');

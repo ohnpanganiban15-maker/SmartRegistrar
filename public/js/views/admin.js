@@ -20,6 +20,7 @@ function viewAdminDashboard() {
   <div class="stat-grid">
     <div class="stat-card"><div class="sic">👥</div><div class="n">${s.totalStudents || 0}</div><div class="l">Total Students</div></div>
     <div class="stat-card gold"><div class="sic">🕓</div><div class="n">${s.pendingRequests || 0}</div><div class="l">Pending Requests</div></div>
+    <div class="stat-card"><div class="sic">🔍</div><div class="n">${s.underReviewRequests || 0}</div><div class="l">Under Review</div></div>
     <div class="stat-card"><div class="sic">⚙️</div><div class="n">${s.processingRequests || 0}</div><div class="l">Processing</div></div>
     <div class="stat-card green"><div class="sic">📦</div><div class="n">${s.readyRequests || 0}</div><div class="l">Ready for Pickup</div></div>
     <div class="stat-card green"><div class="sic">✅</div><div class="n">${s.completedRequests || 0}</div><div class="l">Completed</div></div>
@@ -229,7 +230,7 @@ function viewAdminAppointments() {
 
 /* ---------------- DOCUMENT REQUESTS ---------------- */
 function viewAdminRequests() {
-  const statuses = ['Pending', 'Processing', 'Ready for Pickup', 'Completed'];
+  const statuses = ['Pending', 'Under Review', 'Processing', 'Ready for Pickup', 'Completed'];
   const f = state.reqAdminFilter || {};
   let list = state.requests || [];
   if (f.search) {
@@ -281,8 +282,7 @@ function viewAdminRequests() {
           <button class="btn btn-sm btn-ghost" onclick="showTimeline(${r.id})" title="Step-by-step history">🕘 History</button>
           <button class="btn btn-sm btn-outline" onclick="Chat.openThread(${r.id})">💬 Chat</button>
           ${statuses.filter(st => st !== r.status).map(st => {
-            const cls = st === 'Completed' || st === 'Ready for Pickup' ? 'btn-success' :
-              (st === 'Rejected' || st === 'Cancelled' ? 'btn-danger' : 'btn-outline');
+            const cls = st === 'Completed' || st === 'Ready for Pickup' ? 'btn-success' : 'btn-outline';
             return `<button class="btn btn-sm ${cls}" onclick="setReqStatus(${r.id},'${st}')">${st}</button>`;
           }).join('')}
         </td>
@@ -622,7 +622,7 @@ function viewAdminAnalytics() {
       <div class="ring-row">
         ${rateRing(rq.completionRate, 'completed', 'var(--success)')}
         ${rateRing(rq.within24hRate, 'within 24h', 'var(--accent)')}
-        ${rateRing(rq.rejectionRate, 'rejected', 'var(--danger)')}
+        ${rateRing(rq.underReviewRate, 'under review', 'var(--accent)')}
       </div>
       <div class="muted small mt-8">${rq.completed || 0} of ${rq.total || 0} requests completed ·
         ${rq.claimed || 0} scanned at the counter ·

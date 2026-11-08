@@ -155,12 +155,11 @@ router.get('/pending-count', requireAuth, (req, res) => {
    plus the scheduled claim deadline. Owner student or admin only. */
 const TIMELINE_ACTIONS = {
   SUBMIT_REQUEST: ['Request submitted', 'submitted'],
+  REQUEST_UNDER_REVIEW: ['Moved to Under Review', 'step'],
   REQUEST_PROCESSING: ['Moved to Processing', 'step'],
   REQUEST_READY_FOR_PICKUP: ['Marked Ready for Pickup', 'ready'],
   REQUEST_COMPLETED: ['Completed by the registrar', 'done'],
   REQUEST_AUTO_COMPLETED: ['Auto-completed after the 24-hour window', 'done'],
-  REQUEST_REJECTED: ['Rejected', 'bad'],
-  REQUEST_CANCELLED: ['Cancelled', 'bad'],
   REQUEST_PENDING: ['Reopened', 'step'],
   QR_CLAIM_SCAN: ['QR scanned — 24-hour claim window started', 'scan'],
   SET_PICKUP_SCHEDULE: ['Pickup schedule set', 'ready']
@@ -213,16 +212,12 @@ router.put('/:id/status', requireAuth, (req, res) => {
   const reqRow = q.get('SELECT * FROM document_requests WHERE id=?', req.params.id);
   if (!reqRow) return res.status(404).json({ error: 'Request not found' });
 
-  const { status, reason, pickupDate, pickupTime } = req.body || {};
-  const allowed = ['Pending', 'Processing', 'Ready for Pickup', 'Completed', 'Rejected', 'Cancelled'];
+  const { status, pickupDate, pickupTime } = req.body || {};
+  const allowed = ['Pending', 'Under Review', 'Processing', 'Ready for Pickup', 'Completed'];
   if (!allowed.includes(status)) return res.status(400).json({ error: 'Invalid status' });
 
   if (req.user.role !== 'admin') {
-    if (status !== 'Cancelled') return res.status(403).json({ error: 'Only the registrar can change this status' });
-    if (reqRow.student_id !== req.user.studentId) return res.status(403).json({ error: 'Not your request' });
-    if (!['Pending', 'Processing'].includes(reqRow.status)) {
-      return res.status(409).json({ error: 'This request can no longer be cancelled' });
-    }
+    return res.status(403).json({ error: 'Only the registrar can change a request status' });
   }
 
   /* pickup schedule may ride along with the status change (admin only) */
@@ -250,12 +245,14 @@ router.put('/:id/status', requireAuth, (req, res) => {
 
   const studentUser = q.get('SELECT id, name, email FROM users WHERE student_id=?', reqRow.student_id);
   const titles = {
-    Processing: 'Request Now Processing', 'Ready for Pickup': 'Document Ready for Pickup',
-    Completed: 'Request Completed', Rejected: 'Request Rejected', Cancelled: 'Request Cancelled',
-    Pending: 'Request Reopened'
+    Pending: 'Request Reopened',
+    'Under Review': 'Request Under Review',
+    Processing: 'Request Now Processing',
+    'Ready for Pickup': 'Document Ready for Pickup',
+    Completed: 'Request Completed'
   };
   if (studentUser) {
-    let body = reqRow.ref + ' (' + reqRow.doc_type + ') → ' + status + (reason ? '. Reason: ' + reason : '.');
+    let body = reqRow.ref + ' (' + reqRow.doc_type + ') → ' + status + '.';
     if (status === 'Ready for Pickup' && date) {
       body += ' You can claim it ' + whenText(date, time) + '.';
     }
@@ -263,12 +260,11 @@ router.put('/:id/status', requireAuth, (req, res) => {
 
     /* the same update also lands in the student's Gmail (fire-and-forget) */
     const subjects = {
+      Pending: 'Your document request was reopened',
+      'Under Review': 'Your document request is under review',
       Processing: 'Your document request is now processing',
       'Ready for Pickup': 'Your document is ready for pickup',
-      Completed: 'Your document request is completed',
-      Rejected: 'Your document request was rejected',
-      Cancelled: 'Your document request was cancelled',
-      Pending: 'Your document request was reopened'
+      Completed: 'Your document request is completed'
     };
     if (subjects[status]) {
       const lines = [
@@ -276,7 +272,6 @@ router.put('/:id/status', requireAuth, (req, res) => {
         '',
         'Your document request ' + reqRow.ref + ' (' + reqRow.doc_type + ') is now: ' + status + '.'
       ];
-      if (reason) lines.push('Reason: ' + reason);
       if (status === 'Ready for Pickup') {
         lines.push(date
           ? 'You can claim it ' + whenText(date, time) + '.'

@@ -597,6 +597,13 @@ const evalA = expr => w.eval(expr);
   await w.eval(`go('adminRequests')`);
   await sleep(250);
   assert($app().includes('editPickup'), 'admin requests table offers a pickup schedule cell');
+  assert($app().includes("setReqStatus(" + reqF.id + ",'Under Review')"),
+    'admin can move a request to Under Review');
+  assert(!$app().includes("setReqStatus(" + reqF.id + ",'Rejected')") &&
+    !$app().includes("setReqStatus(" + reqF.id + ",'Cancelled')"),
+    'admin has no reject or cancel action for document requests');
+  assert(!$app().includes('>Rejected</option>') && !$app().includes('>Cancelled</option>'),
+    'the request status filter lists only the five live statuses');
   evalA(`setReqStatus(${reqF.id}, 'Ready for Pickup')`);
   await sleep(60);
   assert(w.document.getElementById('pk-date') !== null,
@@ -780,6 +787,12 @@ const evalA = expr => w.eval(expr);
   await sleep(300);
   await w.eval(`go('myRequests')`);
   await sleep(250);
+  assert($app().includes('Under Review'),
+    'student request filters include Under Review');
+  assert(!$app().includes('cancelRequest('),
+    'student can no longer cancel a document request');
+  assert(!$app().includes('Rejected'),
+    'student tracking shows no Rejected label');
   {
     const note = w.document.querySelector('.pickup-note');
     assert(!!note, 'student sees a ready-for-pickup note on the request');

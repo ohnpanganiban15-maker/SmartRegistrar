@@ -904,16 +904,6 @@ async function confirmSubmitRequest() {
     if (box) box.innerHTML = '<div class="error-box">' + esc(err.message) + '</div>';
   }
 }
-async function cancelRequest(id) {
-  const ok = await confirmDlg('Cancel this document request?', 'Yes, cancel it');
-  if (!ok) return;
-  try {
-    await Api.put('/api/requests/' + id + '/status', { status: 'Cancelled' });
-    toast('Request cancelled.');
-    await go('myRequests');
-  } catch (err) { toast(err.message, 'error'); }
-}
-
 /* ---------- notifications ---------- */
 async function markNotifRead(id) {
   try {
@@ -1181,10 +1171,6 @@ async function confirmReschedule(apptId, slotId) {
 
 /* ---------- admin: request actions ---------- */
 async function setReqStatus(id, status) {
-  if (['Rejected', 'Cancelled'].includes(status)) {
-    const ok = await confirmDlg('Mark this request as ' + status + '? The student will be notified.', 'Yes');
-    if (!ok) return;
-  }
   /* choosing "Ready for Pickup" always asks WHEN the student can claim it */
   let when = null;
   if (status === 'Ready for Pickup') {
@@ -1397,9 +1383,10 @@ const ASSISTANT_KB = [
   },
   {
     keys: ['cancel', 'delete my request', 'void', 'babawasan'],
-    text: 'While a request is still **Pending** or **Processing** you can cancel it yourself from ' +
-      '**My Requests**. Once it is Ready for Pickup, talk to the registrar through Customer Service.',
-    action: { js: "go('myRequests')", label: 'Open My Requests' }
+    text: 'Document requests can no longer be cancelled from the app. If you filed one by mistake, ' +
+      'message the registrar through **Customer Service** and they will advise you. Approved requests ' +
+      'move through **Under Review**, **Processing**, **Ready for Pickup**, then **Completed**.',
+    action: { js: "Chat.open()", label: 'Ask the registrar' }
   },
   {
     keys: ['fee', 'fees', 'bayad', 'magkano', 'how much', 'price', 'payment', 'pay'],
@@ -1603,7 +1590,7 @@ async function printReport(kind) {
           ['Total students', st.totalStudents],
           ['Document requests (all)', rq.total],
           ['Completed', rq.completed + ' (' + rq.completionRate + '%)'],
-          ['Rejected / cancelled', rq.rejected + ' (' + rq.rejectionRate + '%)'],
+          ['Under review', rq.underReview + ' (' + rq.underReviewRate + '%)'],
           ['Still in the queue (backlog > 2 days)', rq.backlog],
           ['Requests filed today / this week', rq.today + ' / ' + rq.week],
           ['Average turnaround', rq.avgTurnaroundH + ' h'],

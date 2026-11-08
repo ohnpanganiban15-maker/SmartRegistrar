@@ -287,8 +287,9 @@ function viewDashboard() {
   </div>
 
   <div class="stat-grid">
-    <div class="stat-card"><div class="sic">🕓</div><div class="n">${s.pendingRequests || 0}</div><div class="l">Pending Requests</div></div>
-    <div class="stat-card gold"><div class="sic">⚙️</div><div class="n">${s.processingRequests || 0}</div><div class="l">Processing</div></div>
+    <div class="stat-card gold"><div class="sic">🕓</div><div class="n">${s.pendingRequests || 0}</div><div class="l">Pending Requests</div></div>
+    <div class="stat-card gold"><div class="sic">🔍</div><div class="n">${s.underReviewRequests || 0}</div><div class="l">Under Review</div></div>
+    <div class="stat-card"><div class="sic">⚙️</div><div class="n">${s.processingRequests || 0}</div><div class="l">Processing</div></div>
     <div class="stat-card green"><div class="sic">✅</div><div class="n">${s.readyRequests || 0}</div><div class="l">Ready for Pickup</div></div>
     <div class="stat-card"><div class="sic">📄</div><div class="n">${s.completedRequests || 0}</div><div class="l">Completed Requests</div></div>
   </div>
@@ -451,7 +452,7 @@ function viewMyRequests() {
     <button class="btn btn-primary" onclick="openRequestForm()">+ New Request</button>
   </div>
   <div class="filters">
-    ${['', 'Pending', 'Processing', 'Ready for Pickup', 'Completed', 'Cancelled'].map(st => `
+    ${['', 'Pending', 'Under Review', 'Processing', 'Ready for Pickup', 'Completed'].map(st => `
       <button class="btn btn-sm ${(state.reqFilter || '') === st ? 'btn-primary' : 'btn-ghost'}"
         onclick="state.reqFilter='${st}';loadView('myRequests')">${st || 'All'}</button>`).join('')}
   </div>
@@ -476,8 +477,6 @@ function viewMyRequests() {
         <button class="btn btn-sm btn-primary" onclick="Chat.openThread(${r.id})">💬 Chat</button>
         <button class="btn btn-sm btn-outline" onclick="showQr('${esc(r.ref)}')">Show QR</button>
         <button class="btn btn-sm btn-ghost" id="tl-btn-${r.id}" onclick="toggleTimeline(${r.id}, this)">🕘 History</button>
-        ${['Pending', 'Processing'].includes(r.status) ? `
-          <button class="btn btn-sm btn-danger" onclick="cancelRequest(${r.id})">Cancel</button>` : ''}
       </div>
       <div class="tl-wrap" id="tl-${r.id}" data-open="0"></div>
     </div>`).join('')}`;

@@ -158,6 +158,7 @@ textarea.input { resize:vertical; min-height:88px; }
   white-space:nowrap; border:1px solid transparent;
 }
 .st-pending { background:var(--warning-pale); color:var(--warning); border-color:var(--warning); }
+.st-under-review { background:var(--info-pale); color:var(--info); border-color:var(--info); }
 .st-approved, .st-confirmed { background:var(--info-pale); color:var(--info); border-color:var(--info); }
 .st-completed, .st-active, .st-ready-for-pickup { background:var(--success-pale); color:var(--success); border-color:var(--success); }
 .st-processing { background:var(--accent-pale); color:var(--accent-deep); border-color:var(--accent); }

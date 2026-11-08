@@ -168,6 +168,21 @@ async function call(method, path, token, body) {
   r = await call('PUT', `/api/requests/${reqId}/status`, student,
     { status: 'Ready for Pickup', pickupDate: '2026-10-23', pickupTime: '10:00' });
   assert(r.status === 403, 'student cannot set a pickup schedule');
+  /* --- five live statuses: Under Review replaces Rejected; no cancellation --- */
+  r = await call('PUT', `/api/requests/${reqId}/status`, admin, { status: 'Under Review' });
+  assert(r.status === 200, 'admin moves a request to Under Review');
+  r = await call('GET', '/api/requests', admin);
+  assert(r.data.find(x => x.id === reqId).status === 'Under Review',
+    'Under Review persisted on the request');
+  r = await call('GET', '/api/notifications', student);
+  assert(r.data.some(n => n.title === 'Request Under Review'),
+    'student notified when the request goes Under Review');
+  r = await call('PUT', `/api/requests/${reqId}/status`, student, { status: 'Under Review' });
+  assert(r.status === 403, 'student cannot change a request status');
+  r = await call('PUT', `/api/requests/${reqId}/status`, admin, { status: 'Rejected' });
+  assert(r.status === 400, 'Rejected is no longer an accepted document-request status');
+  r = await call('PUT', `/api/requests/${reqId}/status`, admin, { status: 'Cancelled' });
+  assert(r.status === 400, 'Cancelled is no longer an accepted document-request status');
   r = await call('PUT', `/api/requests/${reqId}/status`, admin,
     { status: 'Ready for Pickup', pickupDate: '2026-10-22', pickupTime: '08:45' });
   assert(r.status === 200, 'request scheduled for pickup again');
@@ -398,6 +413,8 @@ async function call(method, path, token, body) {
   assert(r.status === 200 && r.data.role === 'student', 'student dashboard stats');
   r = await call('GET', '/api/reports', admin);
   assert(r.status === 200 && Array.isArray(r.data.appointmentsByStatus), 'admin reports');
+  assert(!r.data.requestsByStatus.some(x => ['Rejected', 'Cancelled'].includes(x.status)),
+    'reports exclude legacy rejected/cancelled requests');
   r = await call('GET', '/api/logs', admin);
   assert(r.status === 200 && r.data.length > 0, 'activity logs recorded');
   r = await call('GET', '/api/logs', student);
@@ -441,6 +458,10 @@ async function call(method, path, token, body) {
       'analytics top documents present');
     assert(Array.isArray(r.data.students.byGrade) && r.data.students.byGrade.length >= 1,
       'analytics students-by-grade present');
+    assert(typeof rq.underReview === 'number' && typeof rq.underReviewRate === 'number',
+      'analytics reports Under Review instead of rejected');
+    assert(rq.rejected === undefined && rq.rejectionRate === undefined,
+      'analytics no longer exposes rejected/rejectionRate');
   }
   r = await call('GET', '/api/analytics', student);
   assert(r.status === 403, 'student blocked from analytics');
@@ -455,7 +476,7 @@ async function call(method, path, token, body) {
   r = await call('GET', '/api/qr/lookup?code=STU-' + stuNum, admin);
   assert(r.data.verify && r.data.verify.verdict === 'VALID' && !!r.data.verify.message,
     'active student verifies as VALID with a message');
-  /* open → claimed → rejected */
+  /* open → claimed → completed (Rejected no longer exists) */
   r = await call('POST', '/api/requests', student,
     { docType: 'Form 137', quantity: 1, purpose: 'Verdict test' });
   assert(r.status === 201 && !!r.data.ref, 'verdict fixture request created');
@@ -469,12 +490,11 @@ async function call(method, path, token, body) {
   assert(r.data.verify && r.data.verify.verdict === 'IN_WINDOW' &&
     /auto-completes in/.test(r.data.verify.message),
     'claimed request verifies as IN_WINDOW with the time left');
-  r = await call('PUT', `/api/requests/${vId}/status`, admin,
-    { status: 'Rejected', reason: 'Verdict test' });
-  assert(r.status === 200, 'verdict fixture rejected');
+  r = await call('PUT', `/api/requests/${vId}/status`, admin, { status: 'Completed' });
+  assert(r.status === 200, 'verdict fixture completed');
   r = await call('GET', '/api/qr/lookup?code=' + vRef, admin);
-  assert(r.data.verify && r.data.verify.verdict === 'INVALID',
-    'rejected request verifies as INVALID');
+  assert(r.data.verify && r.data.verify.verdict === 'COMPLETED',
+    'completed request verifies as COMPLETED');
 
   /* --- P2: document requirements management --- */
   r = await call('GET', '/api/requests/types', admin);

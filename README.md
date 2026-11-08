@@ -70,7 +70,7 @@ same Wi-Fi network.
 4. Every following request carries `Authorization: Bearer <token>` — the backend checks the token and the user's **role** (admin/student) before allowing access.
 5. The booking is validated **inside a database transaction**: the slot must be open and free of other active appointments → **double booking is impossible**.
 6. Data is stored in the **SQLite file** (`database/smart-registrar.db`), and a **notification** is written for the student.
-7. When the registrar changes a request/appointment status (Processing, Ready for Pickup, Completed, Rejected, Cancelled), the student also gets an **email** — via **Brevo HTTP API** when `BREVO_API_KEY` + `MAIL_FROM` are set (works on Render Free), or **Gmail SMTP** when `GMAIL_USER` + `GMAIL_APP_PASSWORD` are set (localhost/paid hosts). With neither, the email is only logged in dev mode.
+7. When the registrar changes a document request status (Pending, Under Review, Processing, Ready for Pickup, Completed) or an appointment status (Approved, Confirmed, Completed, Cancelled, Rejected), the student also gets an **email** — via **Brevo HTTP API** when `BREVO_API_KEY` + `MAIL_FROM` are set (works on Render Free), or **Gmail SMTP** when `GMAIL_USER` + `GMAIL_APP_PASSWORD` are set (localhost/paid hosts). With neither, the email is only logged in dev mode. Document requests are never rejected or cancelled.
 8. The registrar's dashboard reads the same database → sees the booking instantly.
 
 **Security practices implemented:**
