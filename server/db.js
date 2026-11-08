@@ -89,6 +89,7 @@ CREATE TABLE IF NOT EXISTS document_requests (
   pickup_date TEXT NOT NULL DEFAULT '',
   pickup_time TEXT NOT NULL DEFAULT '',
   claimed_at  TEXT NOT NULL DEFAULT '',
+  completed_at TEXT NOT NULL DEFAULT '',
   notes       TEXT NOT NULL DEFAULT '',
   status      TEXT NOT NULL DEFAULT 'Pending'
               /* Under Review is the new registrar triage step. Rejected/Cancelled
@@ -197,6 +198,7 @@ ensureColumn('users', 'token_version INTEGER NOT NULL DEFAULT 0');
 ensureColumn('students', "profile_photo TEXT NOT NULL DEFAULT ''");
 ensureColumn('document_requests', "pickup_time TEXT NOT NULL DEFAULT ''");
 ensureColumn('document_requests', "claimed_at TEXT NOT NULL DEFAULT ''");
+ensureColumn('document_requests', "completed_at TEXT NOT NULL DEFAULT ''");
 /* P2 — document requirements management */
 ensureColumn('document_types', "description TEXT NOT NULL DEFAULT ''");
 ensureColumn('document_types', "requirements TEXT NOT NULL DEFAULT ''");
@@ -239,6 +241,7 @@ function migrateRequestStatuses() {
         pickup_date TEXT NOT NULL DEFAULT '',
         pickup_time TEXT NOT NULL DEFAULT '',
         claimed_at  TEXT NOT NULL DEFAULT '',
+        completed_at TEXT NOT NULL DEFAULT '',
         notes       TEXT NOT NULL DEFAULT '',
         status      TEXT NOT NULL DEFAULT 'Pending'
                     CHECK(status IN ('Pending','Under Review','Processing','Ready for Pickup','Completed','Rejected','Cancelled')),
@@ -248,9 +251,9 @@ function migrateRequestStatuses() {
     db.exec(`
       INSERT INTO document_requests_new
         (id, ref, student_id, student_name, doc_type, quantity, purpose,
-         pickup_date, pickup_time, claimed_at, notes, status, created_at, updated_at)
+         pickup_date, pickup_time, claimed_at, completed_at, notes, status, created_at, updated_at)
       SELECT id, ref, student_id, student_name, doc_type, quantity, purpose,
-             pickup_date, pickup_time, claimed_at, notes, status, created_at, updated_at
+             pickup_date, pickup_time, claimed_at, completed_at, notes, status, created_at, updated_at
       FROM document_requests`);
     db.exec('DROP TABLE document_requests');
     db.exec('ALTER TABLE document_requests_new RENAME TO document_requests');

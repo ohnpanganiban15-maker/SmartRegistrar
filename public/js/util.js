@@ -43,6 +43,13 @@ function fmtTime(t) {
   h = h % 12; if (h === 0) h = 12;
   return h + ':' + m[2] + ' ' + ap;
 }
+/* UTC stamp "2026-11-08 02:30:00" → local "Nov 8, 2026, 10:30 AM" */
+function fmtDateTime(stamp) {
+  const d = utcDate(stamp);
+  if (!d) return '—';
+  return d.toLocaleString('en-US',
+    { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' });
+}
 function timeRange(start, end) { return fmtTime(start) + ' – ' + fmtTime(end); }
 function initials(name) {
   return String(name || '?').split(/\s+/).map(w => w[0]).slice(0, 2).join('').toUpperCase();

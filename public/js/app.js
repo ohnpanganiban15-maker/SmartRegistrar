@@ -1264,7 +1264,7 @@ function timelineHTML(t) {
       <span class="tl-dot"></span>
       <div class="tl-body">
         <div class="tl-label"><b>${esc(e.label)}</b>
-          <span class="muted small">${esc(String(e.at || '').replace('T', ' ').slice(0, 16))}</span></div>
+          <span class="muted small">${esc(fmtDateTime(e.at))}</span></div>
         <div class="muted small">${esc(e.detail || '')}${e.actor ? ' · ' + esc(e.actor) : ''}</div>
       </div>
     </li>`).join('') + '</ol>';

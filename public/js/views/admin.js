@@ -276,7 +276,9 @@ function viewAdminRequests() {
                 title="The request auto-completes 24 hours after it was scanned">⏱ auto-complete
                 ${esc(claimDeadlineText(r.claimed_at))} · ${esc(claimTimeLeft(r.claimed_at))}</div>` : ''}`}
         </td>
-        <td data-label="Status">${stamp(r.status)}</td>
+        <td data-label="Status">${stamp(r.status)}
+          ${r.status === 'Completed' && r.completed_at
+            ? `<div class="muted small">${esc(fmtDateTime(r.completed_at))}</div>` : ''}</td>
         <td class="cell-actions" data-label="">
           <button class="btn btn-sm btn-ghost" onclick="showQr('${esc(r.ref)}')">QR</button>
           <button class="btn btn-sm btn-ghost" onclick="showTimeline(${r.id})" title="Step-by-step history">🕘 History</button>

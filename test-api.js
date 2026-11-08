@@ -227,8 +227,11 @@ async function call(method, path, token, body) {
   r = await call('POST', '/api/requests/auto-complete', admin, {});
   assert(r.status === 200 && r.data.completed >= 1, 'sweep auto-completes the expired claim window');
   r = await call('GET', '/api/requests', admin);
-  assert(r.data.find(x => x.id === reqId).status === 'Completed',
-    'request auto-marked Completed after 24 hours');
+  const autoRow = r.data.find(x => x.id === reqId);
+  const backdatedClaim = autoRow.claimed_at;
+  assert(autoRow.status === 'Completed', 'request auto-marked Completed after 24 hours');
+  assert(autoRow.completed_at === backdatedClaim,
+    'Completed time is the QR scan time, not the sweep time');
   r = await call('GET', '/api/notifications', student);
   assert(r.data.some(n => n.title === 'Request Completed' && /24-hour/i.test(n.body)),
     'student notified of the automatic completion');
@@ -249,6 +252,9 @@ async function call(method, path, token, body) {
   const reqManual = r.data.id;
   r = await call('PUT', `/api/requests/${reqManual}/status`, admin, { status: 'Completed' });
   assert(r.status === 200, 'admin may still press Completed manually (no QR scan needed)');
+  r = await call('GET', '/api/requests', admin);
+  const manualRow = r.data.find(x => x.id === reqManual);
+  assert(!!manualRow.completed_at, 'manual completion records the time it was pressed');
   r = await call('PUT', `/api/requests/${reqManual}/pickup`, admin, { date: '2026-10-26', time: '10:00' });
   assert(r.status === 409, 'manually completed request is locked too');
   r = await call('POST', `/api/requests/${reqManual}/claim`, admin, {});
@@ -264,12 +270,22 @@ async function call(method, path, token, body) {
     assert(tl.some(e => e.label === 'Request submitted'), 'timeline starts with the submission step');
     assert(tl.some(e => e.kind === 'scan'), 'timeline records the QR scan / claim window');
     assert(tl.some(e => e.kind === 'done'), 'timeline records the completion');
+    {
+      const doneEvt = tl.find(e => e.kind === 'done');
+      assert(!!doneEvt && doneEvt.at === backdatedClaim,
+        'timeline Completed step shows the QR scan time');
+    }
     let chrono = true;
     for (let i = 1; i < tl.length; i++) if (String(tl[i - 1].at) > String(tl[i].at)) chrono = false;
     assert(chrono, 'timeline events are chronological (' + tl.length + ' steps)');
   }
   r = await call('GET', `/api/requests/${reqManual}/timeline`, admin);
   assert(r.status === 200 && r.data.ref, 'admin can read any request timeline');
+  {
+    const doneEvt = (r.data.events || []).find(e => e.kind === 'done');
+    assert(!!doneEvt && doneEvt.at === manualRow.completed_at,
+      'manual Completed step shows the exact time it was pressed');
+  }
   r = await call('GET', '/api/requests/999999/timeline', admin);
   assert(r.status === 404, 'unknown request timeline → 404');
   /* a different student must not read someone else's history */

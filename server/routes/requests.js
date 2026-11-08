@@ -159,7 +159,7 @@ const TIMELINE_ACTIONS = {
   REQUEST_PROCESSING: ['Moved to Processing', 'step'],
   REQUEST_READY_FOR_PICKUP: ['Marked Ready for Pickup', 'ready'],
   REQUEST_COMPLETED: ['Completed by the registrar', 'done'],
-  REQUEST_AUTO_COMPLETED: ['Auto-completed after the 24-hour window', 'done'],
+  REQUEST_AUTO_COMPLETED: ['Completed — QR scanned at the counter', 'done'],
   REQUEST_PENDING: ['Reopened', 'step'],
   QR_CLAIM_SCAN: ['QR scanned — 24-hour claim window started', 'scan'],
   SET_PICKUP_SCHEDULE: ['Pickup schedule set', 'ready']
@@ -178,9 +178,16 @@ router.get('/:id/timeline', requireAuth, (req, res) => {
   for (const l of rows) {
     const m = TIMELINE_ACTIONS[l.action];
     if (!m) continue;
+    /* completion events show WHEN the document was actually scanned or
+       manually completed — not when the background sweep ran. */
+    const done = l.action === 'REQUEST_AUTO_COMPLETED' || l.action === 'REQUEST_COMPLETED';
+    let detail = '';
+    if (l.action === 'SUBMIT_REQUEST') detail = r.doc_type + ' × ' + r.quantity;
+    else if (l.action === 'REQUEST_AUTO_COMPLETED') detail = 'Auto-closed 24 hours after the scan';
     events.push({
-      at: l.created_at, label: m[0], kind: m[1], actor: l.user_name || 'system',
-      detail: l.action === 'SUBMIT_REQUEST' ? r.doc_type + ' × ' + r.quantity : ''
+      at: done && r.completed_at ? r.completed_at : l.created_at,
+      label: m[0], kind: m[1], actor: l.user_name || 'system',
+      detail
     });
   }
   /* the very first step is always the submission itself */
@@ -201,7 +208,7 @@ router.get('/:id/timeline', requireAuth, (req, res) => {
   res.json({
     ref: r.ref, status: r.status, doc_type: r.doc_type,
     pickup_date: r.pickup_date || '', pickup_time: r.pickup_time || '',
-    claimed_at: r.claimed_at || '', events
+    claimed_at: r.claimed_at || '', completed_at: r.completed_at || '', events
   });
 });
 
@@ -241,7 +248,8 @@ router.put('/:id/status', requireAuth, (req, res) => {
   }
 
   q.run(`UPDATE document_requests SET status=?, pickup_date=?, pickup_time=?,
-         updated_at=datetime('now') WHERE id=?`, status, date, time, reqRow.id);
+         completed_at=CASE WHEN ?='Completed' THEN datetime('now') ELSE '' END,
+         updated_at=datetime('now') WHERE id=?`, status, date, time, status, reqRow.id);
 
   const studentUser = q.get('SELECT id, name, email FROM users WHERE student_id=?', reqRow.student_id);
   const titles = {
@@ -352,7 +360,7 @@ function sweepAutoComplete() {
       AND datetime(claimed_at, '+24 hours') <= datetime('now')`);
   for (const r of due) {
     q.run(`UPDATE document_requests SET status='Completed',
-           updated_at=datetime('now') WHERE id=?`, r.id);
+           completed_at=?, updated_at=datetime('now') WHERE id=?`, r.claimed_at, r.id);
     const studentUser = q.get('SELECT id, name, email FROM users WHERE student_id=?', r.student_id);
     if (studentUser) {
       notify(studentUser.id, 'Request Completed',
@@ -385,7 +393,8 @@ router.post('/:id/claim', requireAuth, (req, res) => {
   if (reqRow.status === 'Completed') {
     return res.json({
       message: 'Already completed', status: 'Completed',
-      claimed_at: reqRow.claimed_at || '', auto_complete_at: '', started: false
+      claimed_at: reqRow.claimed_at || '', completed_at: reqRow.completed_at || '',
+      auto_complete_at: '', started: false
     });
   }
   let claimedAt = reqRow.claimed_at || '';
