@@ -270,6 +270,19 @@ function migrateRequestStatuses() {
 }
 migrateRequestStatuses();
 
+/* ---- backfill completed_at for requests finished before the field existed.
+   Manual completions use the exact REQUEST_COMPLETED log time; scanned ones
+   use the QR scan time; anything else falls back to the last update. ---- */
+db.exec(`
+  UPDATE document_requests
+  SET completed_at = COALESCE(
+    (SELECT MAX(created_at) FROM activity_logs
+      WHERE action='REQUEST_COMPLETED' AND details=document_requests.ref),
+    CASE WHEN claimed_at != '' THEN claimed_at ELSE updated_at END
+  )
+  WHERE status='Completed' AND completed_at=''
+`);
+
 /* ---- ensure required document types exist (safe on old + fresh DBs) ---- */
 const insertDocType = db.prepare('INSERT OR IGNORE INTO document_types (name) VALUES (?)');
 for (const t of ['SF9', 'SF10']) insertDocType.run(t);
