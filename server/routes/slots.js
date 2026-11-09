@@ -8,10 +8,19 @@
    POST /api/slots/close-date → admin: close/reopen a whole day
 ===================================================== */
 const express = require('express');
-const { q, logActivity } = require('../db');
+const { db, q, logActivity } = require('../db');
 const { requireAuth, requireAdmin, validateBody } = require('../auth');
 
 const router = express.Router();
+
+/* "HH:MM" ↔ minutes since midnight (used when splitting a time range) */
+function toMin(t) {
+  const m = String(t || '').match(/^([01]?\d|2[0-3]):([0-5]\d)$/);
+  return m ? Number(m[1]) * 60 + Number(m[2]) : NaN;
+}
+function toTime(min) {
+  return String(Math.floor(min / 60)).padStart(2, '0') + ':' + String(min % 60).padStart(2, '0');
+}
 
 /* open slots (students) — only future, open, not fully booked */
 router.get('/', requireAuth, (req, res) => {
@@ -44,19 +53,62 @@ router.get('/dates', requireAuth, (req, res) => {
   res.json(rows.map(r => r.date));
 });
 
-/* admin: add a slot */
+/* admin: add slot(s) — `count` splits the time range evenly, so the registrar
+   decides how many students can be served in that window (1 student per slot) */
 router.post('/', requireAuth, requireAdmin, (req, res) => {
   const b = req.body || {};
   if (!validateBody(res, b, ['date', 'startTime', 'endTime'])) return;
   if (!/^\d{4}-\d{2}-\d{2}$/.test(b.date)) return res.status(400).json({ error: 'Date must be YYYY-MM-DD' });
-  if (q.get('SELECT id FROM appointment_slots WHERE date=? AND start_time=? AND end_time=?',
-    b.date, b.startTime, b.endTime)) {
-    return res.status(409).json({ error: 'That slot already exists' });
+
+  const count = b.count === undefined || b.count === '' || b.count === null ? 1 : Number(b.count);
+  if (!Number.isInteger(count) || count < 1 || count > 50) {
+    return res.status(400).json({ error: 'Number of slots must be a whole number from 1 to 50' });
   }
-  const r = q.run('INSERT INTO appointment_slots (date, start_time, end_time) VALUES (?,?,?)',
-    b.date, b.startTime, b.endTime);
-  logActivity(req.user.id, req.user.name, 'ADD_SLOT', b.date + ' ' + b.startTime + '-' + b.endTime);
-  res.status(201).json({ id: Number(r.lastInsertRowid), message: 'Slot added' });
+  const startMin = toMin(b.startTime);
+  const endMin = toMin(b.endTime);
+  if (!Number.isFinite(startMin) || !Number.isFinite(endMin)) {
+    return res.status(400).json({ error: 'Start and end time must be HH:MM' });
+  }
+  if (endMin <= startMin) return res.status(400).json({ error: 'End time must be after start time' });
+  const totalMin = endMin - startMin;
+  if (count > totalMin) {
+    return res.status(400).json({ error: 'That time range is too short for ' + count + ' slot(s)' });
+  }
+
+  /* split [start, end) into `count` equal pieces (whole minutes) */
+  const pieces = [];
+  for (let i = 0; i < count; i++) {
+    const s = startMin + Math.round(i * totalMin / count);
+    const e = startMin + Math.round((i + 1) * totalMin / count);
+    pieces.push({ start: toTime(s), end: toTime(e) });
+  }
+
+  const clash = pieces.find(g => q.get(
+    'SELECT id FROM appointment_slots WHERE date=? AND start_time=? AND end_time=?',
+    b.date, g.start, g.end));
+  if (clash) {
+    return res.status(409).json({
+      error: 'Some of those slots already exist (' + clash.start + '–' + clash.end + ' on ' + b.date + ')'
+    });
+  }
+
+  db.exec('BEGIN IMMEDIATE');
+  try {
+    const ids = pieces.map(g => Number(q.run(
+      'INSERT INTO appointment_slots (date, start_time, end_time) VALUES (?,?,?)',
+      b.date, g.start, g.end).lastInsertRowid));
+    db.exec('COMMIT');
+    logActivity(req.user.id, req.user.name, 'ADD_SLOT',
+      b.date + ' ' + pieces[0].start + '-' + pieces[pieces.length - 1].end +
+      (count > 1 ? ' (' + count + ' slots)' : ''));
+    res.status(201).json({
+      id: ids[0], ids, count,
+      message: count === 1 ? 'Slot added' : count + ' slots added'
+    });
+  } catch (e) {
+    db.exec('ROLLBACK');
+    throw e;
+  }
 });
 
 /* admin: edit / close / reopen */

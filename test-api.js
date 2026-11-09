@@ -331,6 +331,25 @@ async function call(method, path, token, body) {
   r = await call('POST', '/api/slots/close-date', admin, { date: freeSlot.date, status: 'available' });
   assert(r.status === 200, 'reopen whole date');
 
+  /* --- the registrar decides how many slots a time range makes --- */
+  r = await call('POST', '/api/slots', admin, { date: '2026-12-27', startTime: '08:00', endTime: '09:00', count: 4 });
+  assert(r.status === 201 && r.data.count === 4 && (r.data.ids || []).length === 4,
+    'registrar sets the number of slots for a time range');
+  r = await call('GET', '/api/slots/all', admin);
+  const split = r.data.filter(s => s.date === '2026-12-27')
+    .sort((a, b) => String(a.start_time).localeCompare(String(b.start_time)));
+  assert(split.length === 4, 'the time range became 4 slots');
+  assert(split[0].start_time === '08:00' && split[0].end_time === '08:15' &&
+    split[3].start_time === '08:45' && split[3].end_time === '09:00',
+    'the 4 slots are split evenly (15 minutes each)');
+  r = await call('POST', '/api/slots', admin, { date: '2026-12-27', startTime: '08:00', endTime: '09:00', count: 4 });
+  assert(r.status === 409, 'creating the same slots twice is refused');
+  r = await call('POST', '/api/slots', admin, { date: '2026-12-27', startTime: '10:00', endTime: '10:05', count: 10 });
+  assert(r.status === 400, 'too many slots for a short range is refused');
+  r = await call('POST', '/api/slots', admin, { date: '2026-12-27', startTime: '11:00', endTime: '12:00', count: 0 });
+  assert(r.status === 400, 'zero slots is refused');
+  for (const s of split) await call('DELETE', `/api/slots/${s.id}`, admin);
+
   /* --- customer service --- */
   r = await call('POST', '/api/chat', student, { subject: 'How long is processing?', body: 'Please advise.' });
   assert(r.status === 201, 'student sends inquiry');

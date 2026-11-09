@@ -1629,12 +1629,18 @@ async function saveSlot(id) {
   const date = document.getElementById('sl-date').value;
   const startTime = document.getElementById('sl-start').value;
   const endTime = document.getElementById('sl-end').value;
+  const countEl = document.getElementById('sl-count');
+  const count = countEl ? Number(countEl.value || 1) : 1;
   if (!date || !startTime || !endTime) { toast('Fill in date, start and end time.', 'error'); return; }
   if (endTime <= startTime) { toast('End time must be after start time.', 'error'); return; }
+  if (!id && (!Number.isInteger(count) || count < 1 || count > 50)) {
+    toast('Number of slots must be a whole number from 1 to 50.', 'error'); return;
+  }
   try {
     if (id) await Api.put('/api/slots/' + id, { date, startTime, endTime });
-    else await Api.post('/api/slots', { date, startTime, endTime });
-    toast(id ? 'Slot updated.' : 'Slot added.');
+    else await Api.post('/api/slots', { date, startTime, endTime, count });
+    toast(id ? 'Slot updated.'
+      : (count === 1 ? 'Slot added.' : count + ' slots added.'));
     await loadView('adminAvailability');
     render();
   } catch (err) { toast(err.message, 'error'); }

@@ -581,9 +581,11 @@ const evalA = expr => w.eval(expr);
   /* --- admin: pickup schedule management UI --- */
   await w.eval(`go('adminAvailability')`);
   await sleep(200);
-  assert($app().includes('Pickup Schedule') && $app().includes('Add a slot') &&
-    $app().includes('Close whole day'),
+  assert($app().includes('Pickup Schedule') && $app().includes('Add slots') &&
+    $app().includes('id="sl-count"') && $app().includes('Close whole day'),
     'pickup schedule management UI present');
+  assert(/split evenly/.test($app()),
+    'the form explains that the count splits the time range');
 
   /* --- admin: "Ready for Pickup" must collect date + time --- */
   const isoPlus = n => {

@@ -306,17 +306,20 @@ function viewAdminAvailability() {
   </div>
 
   <div class="panel">
-    <div class="panel-title">Add a slot</div>
+    <div class="panel-title">Add slots</div>
     <div class="form-row">
       <div class="field"><label>Date</label><input class="input" type="date" id="sl-date" min="${todayISO()}"></div>
-      <div class="field"><label>Start time</label><input class="input" type="time" id="sl-start" value="08:00"></div>
+      <div class="field"><label>Number of slots</label>
+        <input class="input" type="number" id="sl-count" min="1" max="50" step="1" value="1"
+          title="How many students can be served in this time range"></div>
     </div>
     <div class="form-row">
+      <div class="field"><label>Start time</label><input class="input" type="time" id="sl-start" value="08:00"></div>
       <div class="field"><label>End time</label><input class="input" type="time" id="sl-end" value="09:00"></div>
-      <div class="field" style="display:flex;align-items:flex-end;">
-        <button class="btn btn-primary btn-block" onclick="saveSlot(null)">Add slot</button>
-      </div>
     </div>
+    <div class="form-hint">One student per slot. The time range is split evenly across the number of slots,
+      so you decide how many students can be served in that window.</div>
+    <button class="btn btn-primary btn-block mt-14" onclick="saveSlot(null)">Add slots</button>
   </div>
 
   ${byDate.length === 0 ? '<div class="card empty"><div class="big">◔</div>No slots yet — add your first one above.</div>' :
