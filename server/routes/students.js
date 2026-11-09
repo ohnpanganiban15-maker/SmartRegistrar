@@ -56,11 +56,15 @@ router.post('/', (req, res) => {
   if (q.get('SELECT id FROM students WHERE student_number = ?', String(b.studentNumber).trim())) {
     return res.status(409).json({ error: 'LRN already exists' });
   }
+  const lastSchoolYear = String(b.lastSchoolYear || '').trim();
+  if (lastSchoolYear && !/^\d{4}-\d{4}$/.test(lastSchoolYear)) {
+    return res.status(400).json({ error: 'School year last attended must look like 2024-2025' });
+  }
   const r = q.run(
-    'INSERT INTO students (student_number, first_name, middle_name, last_name, grade_level, strand, contact, email, status) VALUES (?,?,?,?,?,?,?,?,?)',
+    'INSERT INTO students (student_number, first_name, middle_name, last_name, grade_level, strand, last_school_year, contact, email, status) VALUES (?,?,?,?,?,?,?,?,?,?)',
     String(b.studentNumber).trim(), String(b.firstName).trim(), String(b.middleName || '').trim(),
     String(b.lastName).trim(), String(b.gradeLevel || '').trim(), String(b.strand || '').trim(),
-    String(b.contact || '').trim(), String(b.email || '').trim(),
+    lastSchoolYear, String(b.contact || '').trim(), String(b.email || '').trim(),
     b.status === 'inactive' ? 'inactive' : 'active'
   );
   logActivity(req.user.id, req.user.name, 'ADD_STUDENT', b.firstName + ' ' + b.lastName);

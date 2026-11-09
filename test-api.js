@@ -31,7 +31,8 @@ async function call(method, path, token, body) {
   const stuNum = 'S-2026-' + uniq.toUpperCase().slice(-6);
   r = await call('POST', '/api/auth/register', null, {
     firstName: 'Fixture', lastName: 'Student', email: stuEmail,
-    password: 'fix12345', studentNumber: stuNum, gradeLevel: '12', strand: 'STEM'
+    password: 'fix12345', studentNumber: stuNum, gradeLevel: '12', strand: 'STEM',
+    lastSchoolYear: '2024-2025'
   });
   assert(r.status === 201 && r.data.devOtp, 'student self-register (OTP sent)');
   r = await call('POST', '/api/auth/register/verify-otp', null, { email: stuEmail, otp: r.data.devOtp });
@@ -46,6 +47,8 @@ async function call(method, path, token, body) {
 
   r = await call('GET', '/api/auth/me', student);
   assert(r.status === 200 && r.data.role === 'student', 'me endpoint with token');
+  assert(r.data.student && r.data.student.last_school_year === '2024-2025',
+    'registration stores the school year last attended');
 
   r = await call('GET', '/api/auth/me', null);
   assert(r.status === 401, 'no token → 401');
@@ -76,6 +79,12 @@ async function call(method, path, token, body) {
     gradeLevel: '11', strand: 'STEM'
   });
   assert(r.status === 400, 'weak password (123456, 6 chars) rejected');
+  r = await call('POST', '/api/auth/register', null, {
+    firstName: 'Bad', lastName: 'Year', email: 'badyear.' + uniq + '@cdlshs.edu.ph',
+    password: 'bad12345', studentNumber: 'S-2026-Y' + uniq.toUpperCase().slice(-6),
+    gradeLevel: '11', strand: 'STEM', lastSchoolYear: 'Grade 10'
+  });
+  assert(r.status === 400, 'invalid school year last attended rejected');
 
   /* --- 1 Gmail = 1 account --- */
   r = await call('POST', '/api/auth/register', null, {
@@ -309,10 +318,16 @@ async function call(method, path, token, body) {
   r = await call('GET', '/api/students', student);
   assert(r.status === 403, 'student blocked from admin students list');
 
-  r = await call('POST', '/api/students', admin, { firstName: 'Temp', lastName: 'Student', studentNumber: 'TMP-' + uniq.toUpperCase() });
+  r = await call('POST', '/api/students', admin, { firstName: 'Temp', lastName: 'Student', studentNumber: 'TMP-' + uniq.toUpperCase(), lastSchoolYear: '2023-2024' });
   if (r.status !== 201) console.log('  [debug add student]', r.status, JSON.stringify(r.data));
   assert(r.status === 201, 'admin adds student');
   const sid = r.data.id;
+  r = await call('GET', '/api/students?search=' + encodeURIComponent('TMP-' + uniq.toUpperCase()), admin);
+  {
+    const added = (r.data || []).find(s => s.id === sid);
+    assert(!!added && added.last_school_year === '2023-2024',
+      'admin-added student keeps the school year last attended');
+  }
   r = await call('PUT', `/api/students/${sid}`, admin, { firstName: 'Temp2', lastName: 'Student', studentNumber: 'TMP-' + uniq.toUpperCase(), gradeLevel: '11' });
   assert(r.status === 403, 'admin cannot edit student info (403)');
   r = await call('DELETE', `/api/students/${sid}`, admin);

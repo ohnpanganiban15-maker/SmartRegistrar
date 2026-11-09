@@ -40,6 +40,7 @@ CREATE TABLE IF NOT EXISTS students (
   last_name     TEXT NOT NULL,
   grade_level   TEXT NOT NULL DEFAULT '',
   strand        TEXT NOT NULL DEFAULT '',
+  last_school_year TEXT NOT NULL DEFAULT '',
   contact       TEXT NOT NULL DEFAULT '',
   email         TEXT NOT NULL DEFAULT '',
   status        TEXT NOT NULL DEFAULT 'active' CHECK(status IN ('active','inactive')),
@@ -196,6 +197,7 @@ ensureColumn('users', 'failed_attempts INTEGER NOT NULL DEFAULT 0');
 ensureColumn('users', "locked_until TEXT NOT NULL DEFAULT ''");
 ensureColumn('users', 'token_version INTEGER NOT NULL DEFAULT 0');
 ensureColumn('students', "profile_photo TEXT NOT NULL DEFAULT ''");
+ensureColumn('students', "last_school_year TEXT NOT NULL DEFAULT ''");
 ensureColumn('document_requests', "pickup_time TEXT NOT NULL DEFAULT ''");
 ensureColumn('document_requests', "claimed_at TEXT NOT NULL DEFAULT ''");
 ensureColumn('document_requests', "completed_at TEXT NOT NULL DEFAULT ''");

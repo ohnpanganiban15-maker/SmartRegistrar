@@ -136,6 +136,8 @@ const evalA = expr => w.eval(expr);
   await sleep(120);
   assert(!!w.document.getElementById('rg-pass') &&
     !!w.document.querySelector('#rg-pass') , 'register form rendered');
+  assert(!!w.document.getElementById('rg-sy'),
+    'register form asks for the school year last attended');
   /* the eye is a sibling button inside .pass-wrap */
   assert(!!w.document.querySelector('.pass-wrap .pass-eye'), 'register password has eye toggle');
   assert(w.document.getElementById('rg-pass').getAttribute('maxlength') === '8',
@@ -145,6 +147,7 @@ const evalA = expr => w.eval(expr);
   w.document.getElementById('rg-first').value = 'Preserve';
   w.document.getElementById('rg-last').value = 'Tester';
   w.document.getElementById('rg-contact').value = '09171234567';
+  w.document.getElementById('rg-sy').value = '2024-2025';
   w.document.getElementById('rg-pass').value = 'abc'; /* weak → client-side error, no network */
   await w.eval("doRegister({ preventDefault: () => {} })");
   await sleep(120);
@@ -156,6 +159,8 @@ const evalA = expr => w.eval(expr);
     'register keeps LRN after error re-render');
   assert(w.document.getElementById('rg-last').value === 'Tester',
     'register keeps last name after error re-render');
+  assert(w.document.getElementById('rg-sy').value === '2024-2025',
+    'register keeps the school year after error re-render');
   /* back to the login screen for the normal flow below */
   await w.eval("go('login')");
   await sleep(80);

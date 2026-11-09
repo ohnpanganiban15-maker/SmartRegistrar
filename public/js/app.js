@@ -241,6 +241,7 @@ function restoreFormValues() {
     _setFormVal('rg-last', g.lastName);
     _setFormVal('rg-middle', g.middleName);
     _setFormVal('rg-contact', g.contact);
+    _setFormVal('rg-sy', g.lastSchoolYear);
     _setFormVal('rg-pass', g.password);
     _setFormVal('rg-grade', g.gradeLevel);
     _setFormVal('rg-strand', g.strandSel);
@@ -558,6 +559,7 @@ async function doRegister(e) {
     middleName: document.getElementById('rg-middle').value.trim(),
     gradeLevel: document.getElementById('rg-grade').value,
     strand: (strandSel === 'TVL/TechPro' && specEl) ? 'TVL/TechPro - ' + specEl.value : strandSel,
+    lastSchoolYear: document.getElementById('rg-sy').value.trim(),
     contact: document.getElementById('rg-contact').value.trim(),
     password: document.getElementById('rg-pass').value
   };
@@ -567,6 +569,7 @@ async function doRegister(e) {
     studentNumber: body.studentNumber, email: body.email, firstName: body.firstName,
     lastName: body.lastName, middleName: body.middleName, gradeLevel: body.gradeLevel,
     strandSel: strandSel, spec: (specEl ? specEl.value : ''), contact: body.contact,
+    lastSchoolYear: body.lastSchoolYear,
     password: body.password
   };
   const keepRg = () => { state.form = state.form || {}; state.form.rg = stash; };
@@ -987,6 +990,7 @@ async function saveStudent(id) {
     middleName: document.getElementById('sf-middle').value.trim(),
     gradeLevel: document.getElementById('sf-grade').value.trim(),
     strand: document.getElementById('sf-strand').value.trim(),
+    lastSchoolYear: (document.getElementById('sf-sy') || {}).value ? document.getElementById('sf-sy').value.trim() : '',
     contact: document.getElementById('sf-contact').value.trim(),
     status: document.getElementById('sf-status').value
   };

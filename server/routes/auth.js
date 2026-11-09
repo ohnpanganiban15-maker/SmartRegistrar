@@ -143,6 +143,10 @@ router.post('/register', async (req, res) => {
   if (q.get('SELECT id FROM students WHERE student_number = ?', String(b.studentNumber).trim())) {
     return res.status(409).json({ error: 'This LRN is already registered' });
   }
+  const lastSchoolYear = String(b.lastSchoolYear || '').trim().replace(/\s+/g, '');
+  if (lastSchoolYear && !/^\d{4}-\d{4}$/.test(lastSchoolYear)) {
+    return res.status(400).json({ error: 'School year last attended must look like 2024-2025' });
+  }
   if (!canSendOtp(email, 'register')) {
     return res.status(429).json({ error: 'Too many OTP requests. Please wait 15 minutes.' });
   }
@@ -154,6 +158,7 @@ router.post('/register', async (req, res) => {
     middleName: String(b.middleName || '').trim(),
     gradeLevel: String(b.gradeLevel || '').trim(),
     strand: String(b.strand || '').trim(),
+    lastSchoolYear,
     contact: String(b.contact || '').trim(),
     password: String(b.password)
   };
@@ -185,8 +190,9 @@ router.post('/register/verify-otp', (req, res) => {
   }
 
   const r1 = q.run(
-    'INSERT INTO students (student_number, first_name, middle_name, last_name, grade_level, strand, contact, email) VALUES (?,?,?,?,?,?,?,?)',
-    p.studentNumber, p.firstName, p.middleName, p.lastName, p.gradeLevel, p.strand, p.contact, email
+    'INSERT INTO students (student_number, first_name, middle_name, last_name, grade_level, strand, contact, email, last_school_year) VALUES (?,?,?,?,?,?,?,?,?)',
+    p.studentNumber, p.firstName, p.middleName, p.lastName, p.gradeLevel, p.strand, p.contact, email,
+    p.lastSchoolYear || ''
   );
   const studentId = Number(r1.lastInsertRowid);
   const r2 = q.run(
@@ -311,7 +317,7 @@ router.get('/me', requireAuth, (req, res) => {
   const out = { id: user.id, name: user.name, email: user.email, role: user.role, studentId: user.student_id };
   if (user.student_id) {
     out.student = q.get(
-      'SELECT id, student_number, first_name, middle_name, last_name, grade_level, strand, contact, email, status, profile_photo FROM students WHERE id = ?',
+      'SELECT id, student_number, first_name, middle_name, last_name, grade_level, strand, last_school_year, contact, email, status, profile_photo FROM students WHERE id = ?',
       user.student_id
     );
   }

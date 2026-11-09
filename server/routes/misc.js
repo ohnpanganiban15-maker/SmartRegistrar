@@ -257,7 +257,7 @@ router.get('/logs/facets', requireAuth, requireAdmin, (req, res) => {
 
 /* ---- CSV export (admin) ---- */
 const EXPORTS = {
-  students: `SELECT student_number, first_name, middle_name, last_name, grade_level, strand, contact, email, status, created_at FROM students ORDER BY id`,
+  students: `SELECT student_number, first_name, middle_name, last_name, grade_level, strand, last_school_year, contact, email, status, created_at FROM students ORDER BY id`,
   requests: `SELECT ref, student_name, doc_type, quantity, purpose, pickup_date, pickup_time, notes, status, created_at, updated_at FROM document_requests ORDER BY id`,
   logs: `SELECT user_name, action, details, created_at FROM activity_logs ORDER BY id DESC`
 };

@@ -141,6 +141,9 @@ function studentFormHTML(s) {
       <div class="field"><label>Strand / Course</label>
         <input class="input" id="sf-strand" value="${esc(s.strand || '')}"></div>
     </div>
+    <div class="field"><label>School Year Last Attended</label>
+      <input class="input" id="sf-sy" placeholder="e.g., 2024-2025"
+        value="${esc(s.last_school_year || '')}"></div>
     <div class="form-row">
       <div class="field"><label>Contact</label>
         <input class="input" id="sf-contact" value="${esc(s.contact || '')}"></div>

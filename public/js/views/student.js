@@ -163,8 +163,13 @@ function viewRegister() {
             <option>Front Office Servicing (FOS)</option>
           </select>
         </div>
-        <div class="field"><label>Contact Number</label>
-          <input class="input" id="rg-contact" placeholder="09XX XXX XXXX"></div>
+        <div class="form-row">
+          <div class="field"><label>School Year Last Attended</label>
+            <input class="input" id="rg-sy" placeholder="e.g., 2024-2025" required
+              pattern="[0-9]{4}-[0-9]{4}" title="Use the format 2024-2025"></div>
+          <div class="field"><label>Contact Number</label>
+            <input class="input" id="rg-contact" placeholder="09XX XXX XXXX"></div>
+        </div>
         <div class="field"><label>Password</label>
           <div class="pass-wrap">
             <input class="input" id="rg-pass" type="password" minlength="8" maxlength="8" placeholder="exactly 8 characters + letters &amp; numbers" required>
@@ -651,6 +656,7 @@ function viewProfile() {
     <div class="kv"><span class="k">LRN</span><span class="v mono">${esc(st.student_number || '—')}</span></div>
     <div class="kv"><span class="k">Grade / Level</span><span class="v">${esc(st.grade_level || '—')}</span></div>
     <div class="kv"><span class="k">Strand</span><span class="v">${esc(st.strand || '—')}</span></div>
+    <div class="kv"><span class="k">School Year Last Attended</span><span class="v">${esc(st.last_school_year || '—')}</span></div>
     <div class="kv"><span class="k">Contact</span><span class="v">${esc(st.contact || '—')}</span></div>
     <div class="kv"><span class="k">Status</span><span class="v">${stamp(st.status || 'active')}</span></div>
   </div>
