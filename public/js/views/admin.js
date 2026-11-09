@@ -283,10 +283,13 @@ function viewAdminRequests() {
           <button class="btn btn-sm btn-ghost" onclick="showQr('${esc(r.ref)}')">QR</button>
           <button class="btn btn-sm btn-ghost" onclick="showTimeline(${r.id})" title="Step-by-step history">🕘 History</button>
           <button class="btn btn-sm btn-outline" onclick="Chat.openThread(${r.id})">💬 Chat</button>
-          ${statuses.filter(st => st !== r.status).map(st => {
-            const cls = st === 'Completed' || st === 'Ready for Pickup' ? 'btn-success' : 'btn-outline';
-            return `<button class="btn btn-sm ${cls}" onclick="setReqStatus(${r.id},'${st}')">${st}</button>`;
-          }).join('')}
+          <select class="input status-select" title="Change status"
+            aria-label="Change status for ${esc(r.ref)}"
+            onchange="setReqStatus(${r.id}, this.value)">
+            ${statuses.map(st => `<option value="${esc(st)}"${st === r.status ? ' selected' : ''}>${esc(st)}</option>`).join('')}
+            ${statuses.includes(r.status) ? ''
+              : `<option value="${esc(r.status)}" selected>${esc(r.status)} (legacy)</option>`}
+          </select>
         </td>
       </tr>`).join('')}</tbody>
   </table></div>`}`;

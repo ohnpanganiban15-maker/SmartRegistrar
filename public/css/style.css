@@ -518,6 +518,10 @@ table.rtable { width:100%; border-collapse:collapse; font-size:13.5px; }
 .rtable tbody tr { transition:transform .15s; }
 .rtable tbody tr:hover td { background:var(--primary-pale); }
 .cell-actions { display:flex; gap:6px; flex-wrap:wrap; }
+.cell-actions .status-select {
+  width:auto; min-width:138px; min-height:34px;
+  padding:7px 10px; font-size:12.5px; font-weight:650; border-radius:11px;
+}
 
 /* ---------- 10. Slot chips (booking) ---------- */
 .slot-group {

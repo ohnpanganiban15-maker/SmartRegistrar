@@ -1175,7 +1175,7 @@ async function setReqStatus(id, status) {
   let when = null;
   if (status === 'Ready for Pickup') {
     when = await askPickup(id);
-    if (!when) return;                     /* cancelled — nothing changes */
+    if (!when) { render(); return; }       /* cancelled — reset the dropdown */
   }
   try {
     const body = { status };

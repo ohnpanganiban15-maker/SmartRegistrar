@@ -597,10 +597,14 @@ const evalA = expr => w.eval(expr);
   await w.eval(`go('adminRequests')`);
   await sleep(250);
   assert($app().includes('editPickup'), 'admin requests table offers a pickup schedule cell');
-  assert($app().includes("setReqStatus(" + reqF.id + ",'Under Review')"),
-    'admin can move a request to Under Review');
-  assert(!$app().includes("setReqStatus(" + reqF.id + ",'Rejected')") &&
-    !$app().includes("setReqStatus(" + reqF.id + ",'Cancelled')"),
+  assert($app().includes('status-select') &&
+    $app().includes('setReqStatus(' + reqF.id + ', this.value)'),
+    'admin changes a request status with one clear dropdown');
+  assert(/<option value="Under Review"/.test($app()),
+    'the status dropdown offers Under Review');
+  assert(!/setReqStatus\([^)]*'Rejected'/.test($app()) &&
+    !/setReqStatus\([^)]*'Cancelled'/.test($app()) &&
+    !$app().includes('>Rejected</option>') && !$app().includes('>Cancelled</option>'),
     'admin has no reject or cancel action for document requests');
   assert(!$app().includes('>Rejected</option>') && !$app().includes('>Cancelled</option>'),
     'the request status filter lists only the five live statuses');
