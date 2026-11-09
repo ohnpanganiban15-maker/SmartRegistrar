@@ -19,7 +19,7 @@
    app still runs normally on the local SQLite file.
 ===================================================== */
 const fs = require('fs');
-const { db, q, migrateDocTypes, backfillCompletedAt } = require('./db');
+const { db, q, migrateDocTypes, seedDocContent, ensureRequirementItems, backfillCompletedAt } = require('./db');
 
 /* tables in a stable order (FK checks are disabled during restore) */
 const TABLES = [
@@ -67,8 +67,12 @@ function restoreFromJSON(snap) {
     resetSequences();
     /* normalize doc types in case the snapshot predates the cleanup */
     migrateDocTypes();
+    /* snapshots may predate the starter content of the new types */
+    seedDocContent();
     /* an older snapshot has no completed_at values — fill them in again */
     backfillCompletedAt();
+    /* snapshots may predate the clearance requirement bullet */
+    ensureRequirementItems();
   } finally {
     db.exec('PRAGMA foreign_keys=ON');
   }

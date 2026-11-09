@@ -1259,6 +1259,70 @@ async function editPickup(id) {
   } catch (err) { toast(err.message, 'error'); }
 }
 
+/* expected-release modal — returns {date} or null when cancelled.
+   Saving with an empty date clears the expected release date. */
+function askRelease(id) {
+  return new Promise(resolve => {
+    const r = (state.requests || []).find(x => x.id === id) || {};
+    let settled = false;
+    const finish = v => {
+      if (settled) return;
+      settled = true;
+      window.__releaseFinish = null;
+      closeModal();
+      resolve(v);
+    };
+    window.__releaseFinish = finish;
+    openModal(
+      '<div class="modal-head">' +
+        '<div class="modal-title">📅 Expected release date</div>' +
+        '<button class="modal-x" onclick="closeModal()" aria-label="Close">&times;</button>' +
+      '</div>' +
+      '<div class="modal-body">' +
+        '<p class="muted">When should <b>' + esc(r.ref || 'this request') + '</b> — ' +
+          esc(r.doc_type || 'document') + ' — be released to <b>' +
+          esc(r.student_name || 'the student') + '</b>?</p>' +
+        '<div class="field"><label for="rl-date">Expected release date</label>' +
+          '<input class="input" type="date" id="rl-date" value="' +
+          esc(r.expected_release_date || '') + '"></div>' +
+        '<div class="muted small" id="rl-hint">The student sees this date. Leave it empty to clear it.</div>' +
+      '</div>' +
+      '<div class="modal-actions">' +
+        '<button class="btn btn-outline" onclick="window.__releaseFinish && window.__releaseFinish(null)">Cancel</button>' +
+        '<button class="btn btn-primary" onclick="window.__releaseSubmit()">Save date</button>' +
+      '</div>');
+    /* closing by backdrop / &times; counts as cancelling */
+    const origClose = window.closeModal;
+    window.closeModal = function () { origClose(); window.closeModal = origClose; finish(null); };
+  });
+}
+
+/* called by the modal's Save button */
+window.__releaseSubmit = function () {
+  const d = ((document.getElementById('rl-date') || {}).value || '').trim();
+  if (d && !/^\d{4}-\d{2}-\d{2}$/.test(d)) {
+    const hint = document.getElementById('rl-hint');
+    if (hint) hint.textContent = '⚠ Please choose a valid date.';
+    return;
+  }
+  if (window.__releaseFinish) window.__releaseFinish({ date: d });
+};
+
+/* edit the expected release date (empty clears it) */
+async function editRelease(id) {
+  const picked = await askRelease(id);
+  if (!picked) return;
+  try {
+    await Api.put('/api/requests/' + id + '/release', { date: picked.date });
+    toast(picked.date
+      ? 'Expected release date set — ' + fmtDateShort(picked.date) + '.'
+      : 'Expected release date cleared.');
+    await loadView(state.view);
+    await updateUnread();
+    render();
+  } catch (err) { toast(err.message, 'error'); }
+}
+
 /* ---------- request timeline (advanced tracking) ---------- */
 function timelineHTML(t) {
   const evts = (t && t.events) || [];

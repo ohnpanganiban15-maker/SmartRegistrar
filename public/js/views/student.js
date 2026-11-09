@@ -477,6 +477,8 @@ function viewMyRequests() {
         </div>` : ''}
       ${r.pickup_date && r.status !== 'Ready for Pickup' ? `
         <div class="muted small">Pickup: ${esc(fmtDateShort(r.pickup_date))}${r.pickup_time ? ' at ' + esc(fmtTime(r.pickup_time)) : ''}</div>` : ''}
+      ${r.expected_release_date ? `
+        <div class="muted small mt-8">📅 Expected release: <b>${esc(fmtDate(r.expected_release_date))}</b></div>` : ''}
       ${r.notes ? `<div class="small mt-8">Notes: ${esc(r.notes)}</div>` : ''}
       ${r.status === 'Completed' && r.completed_at ? `
         <div class="muted small mt-8">✅ Completed: ${esc(fmtDateTime(r.completed_at))}</div>` : ''}

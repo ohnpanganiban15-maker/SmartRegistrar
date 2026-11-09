@@ -94,14 +94,23 @@ function viewAdminStudents() {
   </div>
   ${list.length === 0 ? '<div class="card empty"><div class="big">👥</div>No students found.</div>' : `
   <div class="table-wrap"><table class="rtable">
-    <thead><tr><th>LRN</th><th>Name</th><th>Grade</th><th>Strand</th><th>Contact</th><th>Status</th><th>Actions</th></tr></thead>
+    <thead><tr><th>LRN</th><th>Name</th><th>Grade</th><th>Strand</th><th>SY Last Attended</th><th>Contact</th>
+      <th>Document Requested</th><th>Request Status</th><th>Request Date</th><th>Status</th><th>Actions</th></tr></thead>
     <tbody>${list.map(s => `
       <tr>
         <td data-label="LRN" class="mono">${esc(s.student_number)}</td>
         <td data-label="Name"><b>${esc(s.first_name + ' ' + s.last_name)}</b></td>
         <td data-label="Grade">${esc(s.grade_level)}</td>
         <td data-label="Strand">${esc(s.strand)}</td>
+        <td data-label="SY Last Attended">${esc(s.last_school_year || '—')}</td>
         <td data-label="Contact">${esc(s.contact || '—')}</td>
+        <td data-label="Document Requested">${s.last_doc_type
+          ? `<b>${esc(s.last_doc_type)}</b><div class="muted small mono">${esc(s.last_req_ref || '')}</div>`
+          : '<span class="muted">—</span>'}</td>
+        <td data-label="Request Status">${s.last_req_status
+          ? stamp(s.last_req_status) : '<span class="muted">—</span>'}</td>
+        <td data-label="Request Date">${s.last_req_date
+          ? esc(fmtDateShort(String(s.last_req_date).slice(0, 10))) : '<span class="muted">—</span>'}</td>
         <td data-label="Status">${stamp(s.status)}${s.account_status === 'disabled' ? ' ' + stamp('disabled') : ''}</td>
         <td class="cell-actions" data-label="">
           <button class="btn btn-sm btn-ghost" onclick="viewStudentProfile(${s.id})">View</button>
@@ -257,7 +266,7 @@ function viewAdminRequests() {
   </div>
   ${list.length === 0 ? '<div class="card empty"><div class="big">📄</div>No requests match.</div>' : `
   <div class="table-wrap"><table class="rtable">
-    <thead><tr><th>Ref</th><th>Student</th><th>Document</th><th>Pickup</th><th>Status</th><th>Actions</th></tr></thead>
+    <thead><tr><th>Ref</th><th>Student</th><th>Document</th><th>Pickup</th><th>Expected Release</th><th>Status</th><th>Actions</th></tr></thead>
     <tbody>${list.map(r => `
       <tr>
         <td data-label="Ref" class="mono">${esc(r.ref)}</td>
@@ -278,6 +287,14 @@ function viewAdminRequests() {
               ${r.claimed_at ? `<div class="muted small claim-tick"
                 title="The request auto-completes 24 hours after it was scanned">⏱ auto-complete
                 ${esc(claimDeadlineText(r.claimed_at))} · ${esc(claimTimeLeft(r.claimed_at))}</div>` : ''}`}
+        </td>
+        <td data-label="Expected Release">
+          <button class="btn btn-sm btn-ghost" onclick="editRelease(${r.id})"
+            title="Set or edit the expected release date">
+            ${r.expected_release_date
+              ? esc(fmtDateShort(r.expected_release_date))
+              : '<span class="muted">+ Set</span>'}
+          </button>
         </td>
         <td data-label="Status">${stamp(r.status)}
           ${r.status === 'Completed' && r.completed_at

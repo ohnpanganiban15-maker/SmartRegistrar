@@ -454,6 +454,20 @@ const evalA = expr => w.eval(expr);
       'admin view renders: ' + v + ' (' + htmlNow.length + ' chars)');
   }
 
+  /* --- admin: Student Records shows the request summary columns --- */
+  await w.eval(`go('adminStudents')`);
+  await sleep(300);
+  assert(/<th>SY Last Attended<\/th>/.test($app()),
+    'student records show the school year last attended');
+  assert(/<th>Document Requested<\/th>/.test($app()),
+    'student records show the document requested');
+  assert(/<th>Request Status<\/th>/.test($app()),
+    'student records show the request status');
+  assert(/<th>Request Date<\/th>/.test($app()),
+    'student records show the request date');
+  assert($app().includes('Form 137'),
+    'student records list the latest requested document');
+
   /* --- admin: appointment approve shown, reject removed --- */
   await w.eval(`go('adminAppointments')`);
   await sleep(200);
@@ -492,6 +506,10 @@ const evalA = expr => w.eval(expr);
   await sleep(300);
   assert($app().includes('Document Requirements'), 'requirements manager renders');
   assert($app().includes('Certificate of Enrollment'), 'requirements table lists existing types');
+  assert($app().includes('Other Certifications') && $app().includes('No Disciplinary Case'),
+    'requirements list includes the new document types');
+  assert(!!$app().match(/<button[^>]*onclick="openTypeForm\(\d+\)"[^>]*>Edit<\/button>/),
+    'every requirements row offers an Edit action');
   assert($app().includes('Processing'), 'requirements table shows the processing column');
   evalA(`openTypeForm()`);
   await sleep(60);
@@ -680,6 +698,24 @@ const evalA = expr => w.eval(expr);
   assert((await rowOf(reqF.id)).status === 'Ready for Pickup',
     'request finally marked ready with the edited schedule');
 
+  /* --- expected release date (admin sets, student later sees it) --- */
+  await w.eval(`go('adminRequests')`);
+  await sleep(250);
+  assert(/<th>Expected Release<\/th>/.test($app()),
+    'admin requests table has an expected release column');
+  evalA(`editRelease(${reqF.id})`);
+  await sleep(60);
+  assert(w.document.getElementById('rl-date') !== null, 'expected release modal opens');
+  w.document.getElementById('rl-date').value = day5;
+  evalA(`window.__releaseSubmit()`);
+  await sleep(500);
+  {
+    const row = await rowOf(reqF.id);
+    assert(!!row && row.expected_release_date === day5, 'expected release date saved');
+    const wantShort = await w.eval(`fmtDateShort('${day5}')`);
+    assert($app().includes(wantShort), 'admin table shows the expected release date');
+  }
+
   /* --- QR scan starts the 24-hour claim window --- */
   const reqCode = (await rowOf(reqF.id)).ref;
   await w.eval(`go('adminScanner')`);
@@ -813,6 +849,15 @@ const evalA = expr => w.eval(expr);
       'note shows the claim date (' + wantDate + ')');
     assert(!!note && note.textContent.includes(wantTime),
       'note shows the claim time (' + wantTime + ')');
+  }
+  {
+    const cards = Array.from(w.document.querySelectorAll('.panel'));
+    const card = cards.find(c => c.textContent.includes(reqF.ref));
+    const wantRelease = await w.eval(`fmtDate('${day5}')`);
+    assert(!!card && /Expected release/.test(card.textContent),
+      'student request card shows the expected release label');
+    assert(!!card && card.textContent.includes(wantRelease),
+      'student request card shows the expected release date');
   }
 
   /* --- advanced tracking: the student expands the request timeline --- */

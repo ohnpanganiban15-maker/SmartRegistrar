@@ -89,6 +89,7 @@ CREATE TABLE IF NOT EXISTS document_requests (
   purpose     TEXT NOT NULL DEFAULT '',
   pickup_date TEXT NOT NULL DEFAULT '',
   pickup_time TEXT NOT NULL DEFAULT '',
+  expected_release_date TEXT NOT NULL DEFAULT '',
   claimed_at  TEXT NOT NULL DEFAULT '',
   completed_at TEXT NOT NULL DEFAULT '',
   notes       TEXT NOT NULL DEFAULT '',
@@ -199,6 +200,7 @@ ensureColumn('users', 'token_version INTEGER NOT NULL DEFAULT 0');
 ensureColumn('students', "profile_photo TEXT NOT NULL DEFAULT ''");
 ensureColumn('students', "last_school_year TEXT NOT NULL DEFAULT ''");
 ensureColumn('document_requests', "pickup_time TEXT NOT NULL DEFAULT ''");
+ensureColumn('document_requests', "expected_release_date TEXT NOT NULL DEFAULT ''");
 ensureColumn('document_requests', "claimed_at TEXT NOT NULL DEFAULT ''");
 ensureColumn('document_requests', "completed_at TEXT NOT NULL DEFAULT ''");
 /* P2 — document requirements management */
@@ -242,6 +244,7 @@ function migrateRequestStatuses() {
         purpose     TEXT NOT NULL DEFAULT '',
         pickup_date TEXT NOT NULL DEFAULT '',
         pickup_time TEXT NOT NULL DEFAULT '',
+        expected_release_date TEXT NOT NULL DEFAULT '',
         claimed_at  TEXT NOT NULL DEFAULT '',
         completed_at TEXT NOT NULL DEFAULT '',
         notes       TEXT NOT NULL DEFAULT '',
@@ -253,9 +256,9 @@ function migrateRequestStatuses() {
     db.exec(`
       INSERT INTO document_requests_new
         (id, ref, student_id, student_name, doc_type, quantity, purpose,
-         pickup_date, pickup_time, claimed_at, completed_at, notes, status, created_at, updated_at)
+         pickup_date, pickup_time, expected_release_date, claimed_at, completed_at, notes, status, created_at, updated_at)
       SELECT id, ref, student_id, student_name, doc_type, quantity, purpose,
-             pickup_date, pickup_time, claimed_at, completed_at, notes, status, created_at, updated_at
+             pickup_date, pickup_time, expected_release_date, claimed_at, completed_at, notes, status, created_at, updated_at
       FROM document_requests`);
     db.exec('DROP TABLE document_requests');
     db.exec('ALTER TABLE document_requests_new RENAME TO document_requests');
@@ -293,7 +296,7 @@ backfillCompletedAt();
 
 /* ---- ensure required document types exist (safe on old + fresh DBs) ---- */
 const insertDocType = db.prepare('INSERT OR IGNORE INTO document_types (name) VALUES (?)');
-for (const t of ['SF9', 'SF10']) insertDocType.run(t);
+for (const t of ['SF9 / Report Card', 'SF10']) insertDocType.run(t);
 
 /* ---- doc-type cleanup: drop retired options, rename Certification ----
    Runs at boot AND again after a persistence restore (an old snapshot may
@@ -302,8 +305,17 @@ function migrateDocTypes() {
   const drop = db.prepare('DELETE FROM document_types WHERE name=?');
   for (const t of ['Form 137', 'Form 138', 'Good Moral Certificate', 'Transcript of Records', 'Diploma']) drop.run(t);
   db.prepare("INSERT OR IGNORE INTO document_types (name) VALUES ('Certified True Copy')").run();
+  db.prepare("INSERT OR IGNORE INTO document_types (name) VALUES ('Other Certifications')").run();
+  db.prepare("INSERT OR IGNORE INTO document_types (name) VALUES ('No Disciplinary Case')").run();
   db.prepare("DELETE FROM document_types WHERE name='Certification'").run();
   db.prepare("UPDATE document_requests SET doc_type='Certified True Copy' WHERE doc_type='Certification'").run();
+  /* merge the old SF9 label into the clearer "SF9 / Report Card" name */
+  const legacySf9 = db.prepare("SELECT id FROM document_types WHERE name='SF9'").get();
+  if (legacySf9) {
+    const newSf9 = db.prepare("SELECT id FROM document_types WHERE name='SF9 / Report Card'").get();
+    if (newSf9) db.prepare('DELETE FROM document_types WHERE id=?').run(legacySf9.id);
+    else db.prepare("UPDATE document_types SET name='SF9 / Report Card' WHERE id=?").run(legacySf9.id);
+  }
 }
 migrateDocTypes();
 
@@ -332,8 +344,8 @@ const DOC_CONTENT = {
     requirements: '• Submit the request through this app\n• State the purpose of the certificate\n• Claim at the counter with your QR code or school ID',
     processing_days: 1
   },
-  'SF9': {
-    description: "Form 9 — the learner's progress report card copy.",
+  'SF9 / Report Card': {
+    description: "Form 9 / Report Card — the learner's progress report card copy.",
     requirements: '• Indicate your grade level and section\n• State the purpose of the request',
     processing_days: 1
   },
@@ -351,14 +363,42 @@ const DOC_CONTENT = {
     description: 'Any other registrar document that is not listed above.',
     requirements: '• Describe the document you need\n• State the purpose of the request',
     processing_days: 2
+  },
+  'Other Certifications': {
+    description: 'Other certifications issued by the school registrar.',
+    requirements: '• Describe the certification you need\n• State the purpose of the request',
+    processing_days: 2
+  },
+  'No Disciplinary Case': {
+    description: 'Certificate confirming that the student has no disciplinary case on record.',
+    requirements: '• State the purpose of the request\n• Valid school ID',
+    processing_days: 1
   }
 };
-{
+function seedDocContent() {
   const fill = db.prepare(
     `UPDATE document_types SET description=?, requirements=?, processing_days=?
      WHERE name=? AND description='' AND requirements='' AND fee='' AND processing_days=1`);
   for (const [name, c] of Object.entries(DOC_CONTENT)) fill.run(c.description, c.requirements, c.processing_days, name);
 }
+seedDocContent();
+
+/* ---- every document requirement list also asks for a clearance check.
+   Idempotent: the bullet is added once, even after a snapshot restore. ---- */
+function ensureRequirementItems() {
+  const rows = db.prepare("SELECT id, name, requirements FROM document_types").all();
+  const add = db.prepare('UPDATE document_types SET requirements=? WHERE id=?');
+  let changed = 0;
+  for (const row of rows) {
+    if (row.name === 'No Disciplinary Case') continue;
+    const text = row.requirements || '';
+    if (/disciplinary/i.test(text)) continue;
+    add.run((text ? text.replace(/\s+$/, '') + '\n' : '') + '• No disciplinary case on record', row.id);
+    changed++;
+  }
+  return changed;
+}
+ensureRequirementItems();
 
 /* ---- small query helpers used by all routes ---- */
 const q = {
@@ -375,4 +415,4 @@ function logActivity(userId, userName, action, details) {
   );
 }
 
-module.exports = { db, q, logActivity, migrateDocTypes, backfillCompletedAt };
+module.exports = { db, q, logActivity, migrateDocTypes, seedDocContent, ensureRequirementItems, backfillCompletedAt };

@@ -140,6 +140,13 @@ async function call(method, path, token, body) {
   assert(r.data.pickup_date === '', 'student cannot set pickup date (left empty for admin)');
   const reqId = r.data.id;
   const reqRef = r.data.ref;
+  r = await call('GET', '/api/students?search=' + encodeURIComponent(stuNum), admin);
+  {
+    const row = (r.data || []).find(s => s.student_number === stuNum);
+    assert(!!row && row.last_doc_type === 'Form 138' && row.last_req_ref === reqRef &&
+      !!row.last_req_status && !!row.last_req_date,
+      'Student Records carries the latest request document/status/date');
+  }
   r = await call('GET', '/api/notifications', admin);
   assert(r.status === 200 && r.data.some(n => n.title.includes('New Document Request')), 'admin notified of new request');
   r = await call('GET', '/api/requests/pending-count', admin);
@@ -203,6 +210,26 @@ async function call(method, path, token, body) {
   r = await call('PUT', `/api/requests/${reqId}/pickup`, admin, { date: '2026-10-24', time: '07:15' });
   assert(r.status === 200 && r.data.pickup_date === '2026-10-24' && r.data.pickup_time === '07:15',
     'admin edits the pickup schedule without touching the status');
+
+  /* --- expected release date (admin sets, student sees) --- */
+  r = await call('PUT', `/api/requests/${reqId}/release`, student, { date: '2026-10-30' });
+  assert(r.status === 403, 'student cannot set the expected release date');
+  r = await call('PUT', `/api/requests/${reqId}/release`, admin, { date: '2026-13-01' });
+  assert(r.status === 400, 'invalid expected release date rejected');
+  r = await call('PUT', `/api/requests/${reqId}/release`, admin, { date: '2026-10-30' });
+  assert(r.status === 200 && r.data.expected_release_date === '2026-10-30',
+    'admin sets the expected release date');
+  r = await call('GET', '/api/requests', student);
+  assert(r.data.some(x => x.id === reqId && x.expected_release_date === '2026-10-30'),
+    'student sees the expected release date');
+  r = await call('GET', '/api/notifications', student);
+  assert(r.data.some(n => n.title.includes('Expected Release Date')),
+    'student notified of the expected release date');
+  r = await call('PUT', `/api/requests/${reqId}/release`, admin, { date: '' });
+  assert(r.status === 200 && r.data.expected_release_date === '',
+    'expected release date can be cleared');
+  r = await call('PUT', `/api/requests/${reqId}/release`, admin, { date: '2026-10-30' });
+  assert(r.status === 200, 'expected release date set again for later checks');
 
   /* --- 24-hour claim window: scanning the request QR starts the clock --- */
   r = await call('POST', `/api/requests/${reqId}/claim`, student, {});
@@ -550,6 +577,14 @@ async function call(method, path, token, body) {
   r = await call('GET', '/api/requests/types', admin);
   assert(r.status === 200 && r.data.length >= 5, 'admin sees every document type (' + r.data.length + ')');
   assert(!r.data.some(t => t.name === 'Diploma'), 'Diploma is retired from the document types');
+  assert(r.data.some(t => t.name === 'SF9 / Report Card'), 'Report Card type is present');
+  assert(r.data.some(t => t.name === 'Other Certifications'), 'Other Certifications type is present');
+  assert(r.data.some(t => t.name === 'No Disciplinary Case'), 'No Disciplinary Case type is present');
+  {
+    const co = r.data.find(t => t.name === 'Certificate of Enrollment');
+    assert(!!co && /disciplinary/i.test(co.requirements || ''),
+      'requirements include the no-disciplinary-case item');
+  }
   {
     const eo = r.data.find(t => t.name === 'Certificate of Enrollment');
     assert(!!eo && (eo.description || '').length > 10,

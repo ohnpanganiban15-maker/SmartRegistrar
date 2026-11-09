@@ -35,7 +35,15 @@ router.use(requireAuth, requireAdmin);
 /* GET /api/students?search=&grade=&status= */
 router.get('/', (req, res) => {
   const { search = '', grade = '', status = '' } = req.query;
-  let sql = `SELECT s.*, u.email AS login_email, u.status AS account_status
+  let sql = `SELECT s.*, u.email AS login_email, u.status AS account_status,
+             (SELECT r.doc_type FROM document_requests r WHERE r.student_id = s.id
+               ORDER BY r.id DESC LIMIT 1) AS last_doc_type,
+             (SELECT r.status FROM document_requests r WHERE r.student_id = s.id
+               ORDER BY r.id DESC LIMIT 1) AS last_req_status,
+             (SELECT r.created_at FROM document_requests r WHERE r.student_id = s.id
+               ORDER BY r.id DESC LIMIT 1) AS last_req_date,
+             (SELECT r.ref FROM document_requests r WHERE r.student_id = s.id
+               ORDER BY r.id DESC LIMIT 1) AS last_req_ref
              FROM students s LEFT JOIN users u ON u.id = s.user_id WHERE 1=1`;
   const params = [];
   if (search) {

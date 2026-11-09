@@ -70,8 +70,9 @@ function seed() {
 
   /* ---- document types ---- */
   const docTypes = [
-    'Certificate of Enrollment', 'SF9', 'SF10',
-    'Certified True Copy', 'Other Registrar Documents'
+    'Certificate of Enrollment', 'SF9 / Report Card', 'SF10',
+    'Certified True Copy', 'Other Registrar Documents', 'Other Certifications',
+    'No Disciplinary Case'
   ];
   for (const name of docTypes) q.run('INSERT OR IGNORE INTO document_types (name) VALUES (?)', name);
 

@@ -22,7 +22,11 @@ function clock(t) {
   h = h % 12; if (h === 0) h = 12;
   return h + ':' + m[2] + ' ' + ap;
 }
-function validDate(v) { return /^\d{4}-\d{2}-\d{2}$/.test(v); }
+function validDate(v) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(v)) return false;
+  const d = new Date(v + 'T00:00:00Z');
+  return !isNaN(d.getTime()) && d.toISOString().slice(0, 10) === v;
+}
 function validTime(v) { return /^([01]?\d|2[0-3]):[0-5]\d$/.test(v); }
 function whenText(date, time) {
   if (!date) return '';
@@ -338,6 +342,48 @@ router.put('/:id/pickup', requireAuth, (req, res) => {
   logActivity(req.user.id, req.user.name, 'SET_PICKUP_SCHEDULE',
     reqRow.ref + ' ' + (date || '(none)') + (time ? ' ' + time : ''));
   res.json({ message: 'Pickup schedule saved', pickup_date: date, pickup_time: time });
+});
+
+/* PUT /api/requests/:id/release — admin sets (or clears) the expected
+   release date. The student sees the same date on their request card. */
+router.put('/:id/release', requireAuth, (req, res) => {
+  if (req.user.role !== 'admin') {
+    return res.status(403).json({ error: 'Only the registrar can set the expected release date' });
+  }
+  const reqRow = q.get('SELECT * FROM document_requests WHERE id=?', req.params.id);
+  if (!reqRow) return res.status(404).json({ error: 'Request not found' });
+  const b = req.body || {};
+  const date = String(b.date == null ? '' : b.date).trim();
+  if (date && !validDate(date)) {
+    return res.status(400).json({ error: 'Invalid expected release date format' });
+  }
+  q.run(`UPDATE document_requests SET expected_release_date=?,
+         updated_at=datetime('now') WHERE id=?`, date, reqRow.id);
+
+  const studentUser = q.get('SELECT id, name, email FROM users WHERE student_id=?', reqRow.student_id);
+  if (studentUser) {
+    if (date) {
+      notify(studentUser.id, 'Expected Release Date Set',
+        reqRow.ref + ' (' + reqRow.doc_type + ') is expected to be released on ' + longDate(date) + '.');
+      sendStatusMail(studentUser.email, 'Smart Registrar — Expected release date', [
+        'Hi ' + (studentUser.name || 'student') + ',',
+        '',
+        'Your document request ' + reqRow.ref + ' (' + reqRow.doc_type + ') is expected to be released on ' +
+          longDate(date) + '.',
+        '',
+        'You can also view this date inside the Smart Registrar app.'
+      ]).catch(() => {});
+    } else {
+      notify(studentUser.id, 'Expected Release Date Cleared',
+        'The expected release date for ' + reqRow.ref + ' (' + reqRow.doc_type + ') was cleared.');
+    }
+  }
+  logActivity(req.user.id, req.user.name, 'REQUEST_RELEASE_DATE',
+    reqRow.ref + ' ' + (date || '(cleared)'));
+  res.json({
+    message: date ? 'Expected release date saved' : 'Expected release date cleared',
+    expected_release_date: date
+  });
 });
 
 /* ---- 24-hour claim window ----------------------------------------
