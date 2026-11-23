@@ -955,6 +955,12 @@ function renderQrInto(id, text) {
   });
 }
 function showQr(ref) {
+  /* a document request QR is single-use: once Completed it can never be shown again */
+  const req = (state.requests || []).find(x => x.ref === ref);
+  if (req && req.status === 'Completed') {
+    toast('QR already used — this request is Completed and the QR can no longer be scanned.', 'error');
+    return;
+  }
   openModal(`
     <div class="modal-head">
       <div class="modal-title">QR Code</div>
@@ -1750,8 +1756,10 @@ async function lookupCode(codeOverride) {
     const d = await Api.get('/api/qr/lookup?code=' + encodeURIComponent(code));
     /* scanning a document request starts its 24-hour claim window */
     let claim = null;
+    let claimError = '';
     if (d.type === 'document_request' && d.id && d.status !== 'Completed') {
-      try { claim = await Api.post('/api/requests/' + d.id + '/claim', {}); } catch (e) { claim = null; }
+      try { claim = await Api.post('/api/requests/' + d.id + '/claim', {}); }
+      catch (e) { claim = null; claimError = e.message || 'This QR can no longer be used.'; }
       if (claim && claim.started) toast('24-hour claim window started for ' + d.ref + '.');
     }
     if (out) out.innerHTML = `
@@ -1773,13 +1781,15 @@ async function lookupCode(codeOverride) {
         ${d.time && d.time !== 'x' ? `<div class="kv"><span class="k">Time</span><span class="v">${fmtTime(d.time) || esc(d.time)}</span></div>` : ''}
         ${d.type === 'document_request' ? (
           d.status === 'Completed'
-            ? `<div class="claim-note locked">🔒 <b>Completed</b> — the pickup schedule is locked and can no longer be edited.</div>`
+            ? `<div class="claim-note locked">🔒 <b>QR already used</b> — this request is Completed, so the QR can no longer be scanned.</div>`
             : claim
               ? `<div class="claim-note"><b>⏱ 24-hour claim window${claim.started ? ' started' : ' running'}</b>
                   — auto-completes <b>${esc(claimDeadlineText(claim.claimed_at))}</b>
                   <span class="muted small">(${esc(claimTimeLeft(claim.claimed_at))}). The registrar may still press
                   <b>Completed</b> manually at any time.</span></div>`
-              : ''
+              : claimError
+                ? `<div class="claim-note locked">⚠️ <b>QR scan refused</b> — ${esc(claimError)}</div>`
+                : ''
         ) : ''}
         <div class="muted small mt-8">Sensitive student details are hidden in QR lookups.</div>
       </div>`;

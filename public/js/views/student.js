@@ -484,7 +484,9 @@ function viewMyRequests() {
         <div class="muted small mt-8">✅ Completed: ${esc(fmtDateTime(r.completed_at))}</div>` : ''}
       <div class="flex mt-14">
         <button class="btn btn-sm btn-primary" onclick="Chat.openThread(${r.id})">💬 Chat</button>
-        <button class="btn btn-sm btn-outline" onclick="showQr('${esc(r.ref)}')">Show QR</button>
+        ${r.status === 'Completed'
+          ? '<span class="muted small">QR already used</span>'
+          : `<button class="btn btn-sm btn-outline" onclick="showQr('${esc(r.ref)}')">Show QR</button>`}
         <button class="btn btn-sm btn-ghost" id="tl-btn-${r.id}" onclick="toggleTimeline(${r.id}, this)">🕘 History</button>
       </div>
       <div class="tl-wrap" id="tl-${r.id}" data-open="0"></div>

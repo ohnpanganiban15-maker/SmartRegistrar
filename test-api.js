@@ -294,8 +294,12 @@ async function call(method, path, token, body) {
   r = await call('PUT', `/api/requests/${reqManual}/pickup`, admin, { date: '2026-10-26', time: '10:00' });
   assert(r.status === 409, 'manually completed request is locked too');
   r = await call('POST', `/api/requests/${reqManual}/claim`, admin, {});
-  assert(r.status === 200 && r.data.started === false && r.data.status === 'Completed',
-    'scanning an already-completed request does nothing');
+  assert(r.status === 409 && r.data.already_used === true &&
+    /already used/i.test(r.data.error || ''),
+    'scanning a completed request QR is refused (409, single-use)');
+  r = await call('GET', '/api/qr/lookup?code=' + manualRow.ref, admin);
+  assert(r.status === 200 && r.data.verify && r.data.verify.verdict === 'USED' &&
+    r.data.verify.tone === 'bad', 'completed request QR verifies as USED');
 
   /* --- advanced tracking: per-request timeline --- */
   r = await call('GET', `/api/requests/${reqId}/timeline`, student);
@@ -545,8 +549,9 @@ async function call(method, path, token, body) {
 
   /* --- enhanced QR verification verdicts --- */
   r = await call('GET', '/api/qr/lookup?code=' + reqRef, admin);
-  assert(r.status === 200 && r.data.verify && r.data.verify.verdict === 'COMPLETED' &&
-    !!r.data.verify.message, 'completed request verifies as COMPLETED');
+  assert(r.status === 200 && r.data.verify && r.data.verify.verdict === 'USED' &&
+    r.data.verify.tone === 'bad' && !!r.data.verify.message,
+    'completed request verifies as USED (QR cannot be reused)');
   r = await call('GET', '/api/qr/lookup?code=' + apptRef, admin);
   assert(r.data.verify && r.data.verify.verdict === 'COMPLETED',
     'completed appointment verifies as COMPLETED');
@@ -570,8 +575,12 @@ async function call(method, path, token, body) {
   r = await call('PUT', `/api/requests/${vId}/status`, admin, { status: 'Completed' });
   assert(r.status === 200, 'verdict fixture completed');
   r = await call('GET', '/api/qr/lookup?code=' + vRef, admin);
-  assert(r.data.verify && r.data.verify.verdict === 'COMPLETED',
-    'completed request verifies as COMPLETED');
+  assert(r.data.verify && r.data.verify.verdict === 'USED' &&
+    r.data.verify.tone === 'bad',
+    'completed request verifies as USED after a completed claim window');
+  r = await call('POST', `/api/requests/${vId}/claim`, admin, {});
+  assert(r.status === 409 && r.data.already_used === true,
+    're-scanning the completed request QR stays refused (409)');
 
   /* --- P2: document requirements management --- */
   r = await call('GET', '/api/requests/types', admin);

@@ -437,8 +437,9 @@ router.post('/:id/claim', requireAuth, (req, res) => {
   const reqRow = q.get('SELECT * FROM document_requests WHERE id=?', req.params.id);
   if (!reqRow) return res.status(404).json({ error: 'Request not found' });
   if (reqRow.status === 'Completed') {
-    return res.json({
-      message: 'Already completed', status: 'Completed',
+    return res.status(409).json({
+      error: 'QR already used — this request is Completed and can no longer be scanned',
+      message: 'QR already used', already_used: true, status: 'Completed',
       claimed_at: reqRow.claimed_at || '', completed_at: reqRow.completed_at || '',
       auto_complete_at: '', started: false
     });

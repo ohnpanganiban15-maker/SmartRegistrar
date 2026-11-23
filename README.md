@@ -401,13 +401,13 @@ npx cap run android
 With the server running (`npm start`), open a **second** terminal in the project folder:
 
 ```text
-node test-persistence.js ← 20 persistence checks (snapshot/restore)
-node test-api.js         ← 250 API checks (auth, booking, documents, queue, security…)
-node test-frontend.js    ← 229 UI checks (every screen, booking flow, dark mode…)
+node test-persistence.js ← 22 persistence checks (snapshot/restore)
+node test-api.js         ← 293 API checks (auth, booking, documents, queue, security…)
+node test-frontend.js    ← 258 UI checks (every screen, booking flow, dark mode…)
 ```
 
-Expected: `Results: 20 passed, 0 failed`, `Results: 250 passed, 0 failed` and
-`Results: 229 passed, 0 failed`.
+Expected: `Results: 22 passed, 0 failed`, `Results: 293 passed, 0 failed` and
+`Results: 258 passed, 0 failed` (573 checks total).
 
 > The automated tests expect **dev mode** (no email provider configured) because
 > they read the OTP from the API response. Leave `BREVO_API_KEY`, `MAIL_FROM`,
@@ -426,7 +426,7 @@ Expected: `Results: 20 passed, 0 failed`, `Results: 250 passed, 0 failed` and
 | 7 | Student → **Request Document** (Form 138, purpose…) | Reference like `REQ-0006` created |
 | 8 | Admin → **Requests** → set *Ready for Pickup* | Student sees status + gets notification |
 | 9 | Admin → **Availability** → add slot / close a whole day | Students immediately see (or lose) that slot |
-| 10 | Show QR on student phone → Admin **Scanner** → manual code entry | Shows student, ref, service, date, status (no sensitive data) |
+| 10 | Show QR on student phone → Admin **Scanner** → manual code entry | Shows student, ref, service, date, status (no sensitive data). Once the request is Completed, the QR is single-use: the scanner shows **USED** and the QR button is disabled. |
 | 11 | Student → **Customer Service** → send inquiry → Admin replies | Student sees reply + notification |
 | 12 | Moon/Sun button on any screen | Dark/light mode switches and **stays** after refresh |
 | 13 | Open on phone via `http://<PC-IP>:3000` | Same features, bottom navigation, no horizontal scrolling |

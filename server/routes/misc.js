@@ -334,7 +334,7 @@ router.get('/qr/lookup', requireAuth, (req, res) => {
     if (!r) return res.status(404).json({ error: 'No request found for ' + code });
     let verify;
     if (r.status === 'Completed') {
-      verify = { verdict: 'COMPLETED', tone: 'muted', message: 'Already claimed — this request is completed.' };
+      verify = { verdict: 'USED', tone: 'bad', message: 'QR already used — this request is Completed and the QR can no longer be scanned.' };
     } else if (r.claimed_at && hoursLeft(r.claimed_at) > 0) {
       verify = {
         verdict: 'IN_WINDOW', tone: 'ok',

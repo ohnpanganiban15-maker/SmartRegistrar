@@ -903,6 +903,25 @@ const evalA = expr => w.eval(expr);
     assert(still.pickup_date === day5 && still.pickup_time === '14:00',
       'the locked pickup date + time are untouched');
   }
+  /* QR is single-use: once Completed the QR can no longer be shown or scanned */
+  assert(!$app().includes(`showQr('${reqF.ref}')`),
+    'completed request row has no QR button');
+  assert($app().includes('QR used'), 'completed request row shows QR used');
+  evalA(`showQr('${reqF.ref}')`);
+  await sleep(100);
+  assert(w.document.getElementById('modal-root').innerHTML === '',
+    'showQr refuses to open a QR for a completed request');
+  assert(/already used/i.test(w.document.getElementById('toast-root').textContent),
+    'the QR already used notice is shown');
+  {
+    const used = await w.eval(`Api.get('/api/qr/lookup?code=${reqF.ref}')`);
+    assert(used.verify.verdict === 'USED' && used.verify.tone === 'bad',
+      'completed request QR lookup verdict is USED');
+    const refused = await w.eval(`Api.post('/api/requests/${reqF.id}/claim',{})
+      .then(() => '', e => e.message)`);
+    assert(/already used/i.test(String(refused)),
+      'claim API refuses the completed QR → ' + refused);
+  }
   /* the registrar opens the same history as a modal */
   evalA(`showTimeline(${reqF.id})`);
   await sleep(700);

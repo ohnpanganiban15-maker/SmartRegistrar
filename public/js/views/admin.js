@@ -300,7 +300,9 @@ function viewAdminRequests() {
           ${r.status === 'Completed' && r.completed_at
             ? `<div class="muted small">${esc(fmtDateTime(r.completed_at))}</div>` : ''}</td>
         <td class="cell-actions" data-label="">
-          <button class="btn btn-sm btn-ghost" onclick="showQr('${esc(r.ref)}')">QR</button>
+          ${r.status === 'Completed'
+            ? '<button class="btn btn-sm btn-ghost" disabled title="QR already used — this request is Completed">QR used</button>'
+            : `<button class="btn btn-sm btn-ghost" onclick="showQr('${esc(r.ref)}')">QR</button>`}
           <button class="btn btn-sm btn-ghost" onclick="showTimeline(${r.id})" title="Step-by-step history">🕘 History</button>
           <button class="btn btn-sm btn-outline" onclick="Chat.openThread(${r.id})">💬 Chat</button>
           <select class="input status-select" title="Change status"
