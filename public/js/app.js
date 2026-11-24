@@ -67,14 +67,19 @@ async function loadView(view) {
   switch (view) {
     case 'login': case 'register': case 'otp': case 'changePassword': case 'forgotPassword': return;
     case 'dashboard': {
-      const [stats, appts, slots, anns] = await Promise.all([
+      const [stats, appts, slots, anns, nowServing] = await Promise.all([
         Api.get('/api/dashboard/stats'), Api.get('/api/appointments'),
-        Api.get('/api/slots'), Api.get('/api/announcements')]);
-      Object.assign(state, { stats, appts, slots, anns });
+        Api.get('/api/slots'), Api.get('/api/announcements'),
+        Api.get('/api/appointments/now-serving?date=' + todayISO())]);
+      Object.assign(state, { stats, appts, slots, anns, nowServing });
       await updateUnread(); return;
     }
     case 'availability': case 'book': {
       state.slots = await Api.get('/api/slots'); return;
+    }
+    case 'apptConfirmed': {
+      const d = state.confirmed && state.confirmed.date;
+      state.nowServing = d ? await Api.get('/api/appointments/now-serving?date=' + d) : null; return;
     }
     case 'myAppointments':
       state.appts = await Api.get('/api/appointments'); return;

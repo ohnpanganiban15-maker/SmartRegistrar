@@ -276,4 +276,17 @@ router.post('/:id/noshow', requireAuth, (req, res) => {
   res.json(q.get('SELECT * FROM appointments WHERE id=?', a.id));
 });
 
+/* GET /api/appointments/now-serving?date=YYYY-MM-DD — any signed-in user.
+   Only the queue number being served is returned (no names), so students
+   can see where the line is without seeing other people's details. */
+router.get('/now-serving', requireAuth, (req, res) => {
+  const d = String(req.query.date || '').trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) return res.status(400).json({ error: 'date must be YYYY-MM-DD' });
+  const row = q.get(
+    `SELECT queue_no FROM appointments
+     WHERE date=? AND queue_state='serving' AND status NOT IN ('Cancelled','Rejected')
+     ORDER BY updated_at DESC LIMIT 1`, d);
+  res.json({ date: d, serving: row ? row.queue_no : null });
+});
+
 module.exports = router;

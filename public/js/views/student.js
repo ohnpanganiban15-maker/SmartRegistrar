@@ -291,6 +291,11 @@ function viewDashboard() {
     </div>
   </div>
 
+  <div class="panel" style="text-align:center;">
+    <div class="muted small">Queue today</div>
+    <div class="mt-8">${nowServingText(state.nowServing)}</div>
+  </div>
+
   <div class="stat-grid">
     <div class="stat-card gold"><div class="sic">🕓</div><div class="n">${s.pendingRequests || 0}</div><div class="l">Pending Requests</div></div>
     <div class="stat-card gold"><div class="sic">🔍</div><div class="n">${s.underReviewRequests || 0}</div><div class="l">Under Review</div></div>
@@ -396,6 +401,13 @@ function viewAvailability() {
   </div>`;
 }
 
+/* "Now serving" number only — no names, so other students' details stay private */
+function nowServingText(ns) {
+  return ns && ns.serving
+    ? 'Now serving: <b>#' + Number(ns.serving) + '</b>'
+    : 'No one is being served yet.';
+}
+
 /* ---------------- BOOK AN APPOINTMENT ---------------- */
 function viewBook() {
   const b = state.book || {};
@@ -461,6 +473,7 @@ function viewApptConfirmed() {
     <div class="muted small mt-8">Your queue number</div>
     <div style="font-size:48px;font-weight:800;color:var(--primary);line-height:1.1;">#${a.queue_no}</div>
     <div class="muted small">Show the QR code below when you arrive. You are #${a.queue_no} in the queue for ${fmtDate(a.date)}.</div>` : ''}
+    <div class="muted small mt-8">${nowServingText(state.nowServing)}</div>
     <p class="muted">Keep this reference number and show the QR code when you arrive.</p>
     <div class="qr-ref mt-14" style="font-size:22px;">${esc(a.ref)}</div>
     <div class="mt-8">${stamp(a.status)}</div>
