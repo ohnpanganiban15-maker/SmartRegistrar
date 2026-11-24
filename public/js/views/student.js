@@ -323,7 +323,7 @@ function viewDashboard() {
 
   <div class="panel" style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;">
     <div><b>📅 Book an appointment</b>
-      <div class="muted small">Pumili ng available na schedule. Makakakuha ka agad ng queue number at QR code.</div></div>
+      <div class="muted small">Choose an available schedule. You will get your queue number and QR code right away.</div></div>
     <button class="btn btn-sm btn-primary" onclick="startBooking()">Book now</button>
   </div>
 
@@ -425,7 +425,7 @@ function viewBook() {
 
   return `
   <div class="page-head">
-    <div><h2>Book an Appointment</h2><div class="sub">Pumili ng serbisyo, petsa, at oras.</div></div>
+    <div><h2>Book an Appointment</h2><div class="sub">Choose a service, date, and time.</div></div>
   </div>
 
   <div class="panel">
