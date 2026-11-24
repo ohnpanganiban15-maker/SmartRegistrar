@@ -411,7 +411,11 @@ function nowServingText(ns) {
 /* ---------------- BOOK AN APPOINTMENT ---------------- */
 function viewBook() {
   const b = state.book || {};
-  const open = (state.slots || []).filter(x => x.status !== 'closed' && !x.is_booked && x.date >= todayISO());
+  const nowHM = new Date().toTimeString().slice(0, 5); // "HH:MM" in the student's local time
+  const open = (state.slots || []).filter(x =>
+    x.status !== 'closed' && !x.is_booked && x.date >= todayISO() &&
+    // hide today's slots whose start time has already passed
+    !(x.date === todayISO() && String(x.start_time).slice(0, 5) <= nowHM));
   const dayGroups = groupByDate(open);
   const daySlots = b.date ? open.filter(x => x.date === b.date) : [];
   const picked = b.slotId ? open.find(x => x.id === b.slotId) : null;
