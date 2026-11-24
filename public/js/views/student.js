@@ -438,10 +438,8 @@ function viewBook() {
   </div>` : ''}
 
   <div class="panel">
-    ${step(4, 'Details and confirm')}
-    <label class="form-label" for="bk-purpose">Purpose (optional)</label>
-    <textarea class="input" id="bk-purpose" rows="3" placeholder="Ano ang kailangan mo?">${esc(b.purpose || '')}</textarea>
-    <div class="kv mt-14"><span class="k">Service</span><span class="v">${esc(b.service || '—')}</span></div>
+    ${step(4, 'Confirm')}
+    <div class="kv"><span class="k">Service</span><span class="v">${esc(b.service || '—')}</span></div>
     <div class="kv"><span class="k">Date</span><span class="v">${b.date ? fmtDate(b.date) : '—'}</span></div>
     <div class="kv"><span class="k">Time</span><span class="v">${picked ? timeRange(picked.start_time, picked.end_time) : '—'}</span></div>
     <div class="flex mt-14" style="justify-content:flex-end;">
