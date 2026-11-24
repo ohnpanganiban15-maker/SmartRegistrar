@@ -17,6 +17,13 @@ function viewAdminDashboard() {
     
   </div>
 
+  ${(s.overdueRequests || 0) + (s.overdueAppointments || 0) > 0 ? `
+  <div class="panel" style="border-left:4px solid var(--warn, #d97706);">
+    <b>⏰ Needs attention:</b>
+    ${s.overdueRequests ? `${s.overdueRequests} document request(s)` : ''}${s.overdueRequests && s.overdueAppointments ? ' and ' : ''}${s.overdueAppointments ? `${s.overdueAppointments} appointment(s)` : ''}
+    still Pending for more than 1 day. Please review them.
+  </div>` : ''}
+
   <div class="stat-grid">
     <div class="stat-card"><div class="sic">👥</div><div class="n">${s.totalStudents || 0}</div><div class="l">Total Students</div></div>
     <div class="stat-card gold"><div class="sic">🕓</div><div class="n">${s.pendingRequests || 0}</div><div class="l">Pending Requests</div></div>

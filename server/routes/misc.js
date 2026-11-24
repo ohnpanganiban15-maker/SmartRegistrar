@@ -58,6 +58,8 @@ router.get('/dashboard/stats', requireAuth, (req, res) => {
       approvedAppointments: c("SELECT COUNT(*) c FROM appointments WHERE status IN ('Approved','Confirmed')"),
       completedAppointments: c("SELECT COUNT(*) c FROM appointments WHERE status='Completed'"),
       pendingRequests: c("SELECT COUNT(*) c FROM document_requests WHERE status='Pending'"),
+      overdueRequests: c("SELECT COUNT(*) c FROM document_requests WHERE status='Pending' AND created_at < datetime('now','-1 day')"),
+      overdueAppointments: c("SELECT COUNT(*) c FROM appointments WHERE status='Pending' AND created_at < datetime('now','-1 day')"),
       underReviewRequests: c("SELECT COUNT(*) c FROM document_requests WHERE status='Under Review'"),
       processingRequests: c("SELECT COUNT(*) c FROM document_requests WHERE status='Processing'"),
       readyRequests: c("SELECT COUNT(*) c FROM document_requests WHERE status='Ready for Pickup'"),
