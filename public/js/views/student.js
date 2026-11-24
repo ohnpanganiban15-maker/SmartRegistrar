@@ -316,6 +316,12 @@ function viewDashboard() {
     <div class="muted mt-8">No pickup schedule posted yet — check back soon.</div>
   </div>`}
 
+  <div class="panel" style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;">
+    <div><b>📅 Book an appointment</b>
+      <div class="muted small">Pumili ng available na schedule. Makakakuha ka agad ng queue number at QR code.</div></div>
+    <button class="btn btn-sm btn-primary" onclick="startBooking()">Book now</button>
+  </div>
+
   <div class="panel asst-promo">
     <div class="flex-between">
       <div><b>🤖 Need help?</b>
@@ -363,6 +369,7 @@ function viewAvailability() {
   return `
   <div class="page-head">
     <div><h2>Pickup Schedule</h2><div class="sub">When you can claim your documents at the registrar.</div></div>
+    <button class="btn btn-primary" onclick="startBooking()">+ Book an appointment</button>
     
   </div>
 
@@ -389,6 +396,60 @@ function viewAvailability() {
   </div>`;
 }
 
+/* ---------------- BOOK AN APPOINTMENT ---------------- */
+function viewBook() {
+  const b = state.book || {};
+  const open = (state.slots || []).filter(x => x.status !== 'closed' && !x.is_booked && x.date >= todayISO());
+  const dayGroups = groupByDate(open);
+  const daySlots = b.date ? open.filter(x => x.date === b.date) : [];
+  const picked = b.slotId ? open.find(x => x.id === b.slotId) : null;
+  const ready = !!(b.service && b.slotId);
+
+  const step = (n, title) => `<div class="panel-title">${n}. ${title}</div>`;
+
+  return `
+  <div class="page-head">
+    <div><h2>Book an Appointment</h2><div class="sub">Pumili ng serbisyo, petsa, at oras.</div></div>
+  </div>
+
+  <div class="panel">
+    ${step(1, 'Choose a service')}
+    <div class="slot-chips">${APPT_SERVICES.map(s => `
+      <button class="slot-chip ${b.service === s ? 'selected' : ''}" onclick="pickService('${esc(s)}')">${esc(s)}</button>`).join('')}
+    </div>
+  </div>
+
+  <div class="panel">
+    ${step(2, 'Choose a date')}
+    ${dayGroups.length === 0 ? '<div class="empty">No open schedule yet. Check back soon.</div>' :
+      `<div class="slot-chips">${dayGroups.map(([iso]) => `
+        <button class="slot-chip ${b.date === iso ? 'selected' : ''}" onclick="pickDate('${esc(iso)}')">${fmtDate(iso)}</button>`).join('')}
+      </div>`}
+  </div>
+
+  ${b.date ? `
+  <div class="panel">
+    ${step(3, 'Choose a time')}
+    ${daySlots.length === 0 ? '<div class="empty">No open time for this date.</div>' :
+      `<div class="slot-chips">${daySlots.map(x => `
+        <button class="slot-chip ${b.slotId === x.id ? 'selected' : ''}"
+          onclick="pickSlot(${Number(x.id)}, '${esc(x.date)}', '${esc(x.start_time)}')">${timeRange(x.start_time, x.end_time)}</button>`).join('')}
+      </div>`}
+  </div>` : ''}
+
+  <div class="panel">
+    ${step(4, 'Details and confirm')}
+    <label class="form-label" for="bk-purpose">Purpose (optional)</label>
+    <textarea class="input" id="bk-purpose" rows="3" placeholder="Ano ang kailangan mo?">${esc(b.purpose || '')}</textarea>
+    <div class="kv mt-14"><span class="k">Service</span><span class="v">${esc(b.service || '—')}</span></div>
+    <div class="kv"><span class="k">Date</span><span class="v">${b.date ? fmtDate(b.date) : '—'}</span></div>
+    <div class="kv"><span class="k">Time</span><span class="v">${picked ? timeRange(picked.start_time, picked.end_time) : '—'}</span></div>
+    <div class="flex mt-14" style="justify-content:flex-end;">
+      <button class="btn btn-primary" ${ready ? '' : 'disabled'} onclick="confirmBooking()">Confirm booking</button>
+    </div>
+  </div>`;
+}
+
 /* ---------------- APPOINTMENT CONFIRMED ---------------- */
 function viewApptConfirmed() {
   const a = state.confirmed;
@@ -398,6 +459,10 @@ function viewApptConfirmed() {
   <div class="panel" style="text-align:center;border-color:var(--success);">
     <div style="font-size:44px;">✅</div>
     <h3 class="mt-8">Booking submitted!</h3>
+    ${a.queue_no ? `
+    <div class="muted small mt-8">Your queue number</div>
+    <div style="font-size:48px;font-weight:800;color:var(--primary);line-height:1.1;">#${a.queue_no}</div>
+    <div class="muted small">Show the QR code below when you arrive. You are #${a.queue_no} in the queue for ${fmtDate(a.date)}.</div>` : ''}
     <p class="muted">Keep this reference number and show the QR code when you arrive.</p>
     <div class="qr-ref mt-14" style="font-size:22px;">${esc(a.ref)}</div>
     <div class="mt-8">${stamp(a.status)}</div>

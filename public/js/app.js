@@ -34,7 +34,7 @@ const state = {
 const VIEWS = {
   login: viewLogin, register: viewRegister, otp: viewOtp, changePassword: viewChangePassword, dashboard: viewDashboard,
   forgotPassword: viewForgotPassword,
-  availability: viewAvailability, apptConfirmed: viewApptConfirmed,
+  availability: viewAvailability, apptConfirmed: viewApptConfirmed, book: viewBook,
   myAppointments: viewMyAppointments, myRequests: viewMyRequests,
   notifications: viewNotifications, service: viewService, myQr: viewMyQr,
   assistant: viewAssistant,
@@ -73,7 +73,7 @@ async function loadView(view) {
       Object.assign(state, { stats, appts, slots, anns });
       await updateUnread(); return;
     }
-    case 'availability': {
+    case 'availability': case 'book': {
       state.slots = await Api.get('/api/slots'); return;
     }
     case 'myAppointments':
@@ -751,9 +751,18 @@ function pickService(name) { state.book.service = name; render(); }
 function pickDate(iso) { state.book.date = iso; state.book.slotId = null; render(); }
 function pickSlot(id, date, startTime) {
   Object.assign(state.book, { slotId: id, date, startTime });
-  if (state.view !== 'availability') go('availability');
-  else render();
+  render();
 }
+/* jump from the dashboard / schedule into the booking wizard */
+function startBooking() {
+  state.book = { service: '', date: '', slotId: null, startTime: '', purpose: '' };
+  go('book');
+}
+/* the services a student can book (the server accepts any text; these match the registrar's list) */
+const APPT_SERVICES = [
+  'Enrollment Assistance', 'Records & Grades Concern', 'Transfer / Withdrawal',
+  'Document Consultation', 'Other Concern'
+];
 async function confirmBooking() {
   const b = state.book;
   if (!b.service || !b.slotId) { toast('Complete steps 1–3 first.', 'error'); return; }
@@ -769,7 +778,7 @@ async function confirmBooking() {
     await go('apptConfirmed');
   } catch (err) {
     toast(err.message, 'error');
-    await go('availability');
+    await go('book');
   }
 }
 async function cancelAppt(id) {
